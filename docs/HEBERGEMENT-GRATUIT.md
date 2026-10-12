@@ -26,7 +26,7 @@ Utilisez le certificat CA fourni par Aiven et une connexion SQL chiffrée avec v
 Le code est publié dans le [dépôt GitHub privé Atlas](https://github.com/lebgdu59165-lab/atlas-discord). L’application GitHub Render a été autorisée pour ce seul dépôt ; la connexion « Git Deployment Credentials » reste à terminer. Créez un **Web Service**, environnement **Node 24**, région Francfort et instance **Free**, sans carte. Compilation :
 
 ```sh
-npm ci --no-audit --no-fund && npm run build
+npm ci --include=dev --no-audit --no-fund && npm run build
 ```
 
 Démarrage :
@@ -35,7 +35,7 @@ Démarrage :
 node scripts/start-hosted.mjs web
 ```
 
-Le lanceur valide les secrets et le token Discord, applique les migrations Prisma puis démarre le web sur le port fourni par Render. Configurez le contrôle de disponibilité sur /api/health : PostgreSQL et Redis doivent répondre, le champ bot contrôle séparément le heartbeat.
+Le fichier render.yaml prépare aussi ces réglages pour un Blueprint : un seul Web Service Free, aucun service payant, et des champs privés à renseigner. La compilation inclut explicitement TypeScript et les outils CSS, même si NODE_ENV est configuré sur production. Le lanceur valide les secrets et le token Discord, applique les migrations Prisma puis démarre le web sur le port fourni par Render. Si APP_URL est absent, le web utilise RENDER_EXTERNAL_URL fourni par Render ; une valeur APP_URL explicite reste prioritaire. Configurez le contrôle de disponibilité sur /api/health : PostgreSQL et Redis doivent répondre, le champ bot contrôle séparément le heartbeat.
 
 Reportez l’adresse HTTPS Render dans APP_URL des deux services. Dans Discord, ajoutez exactement APP_URL/api/auth/callback, invitez le bot sur un serveur de test et activez les intents nécessaires et autorisés.
 

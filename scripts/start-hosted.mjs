@@ -8,6 +8,9 @@ if (!['web','bot'].includes(role)) {
   console.error('Usage : node scripts/start-hosted.mjs web|bot');
   process.exit(1);
 }
+// Render fournit l'origine publique après la création du service.
+// Une origine explicitement configurée reste prioritaire, notamment pour un domaine personnalisé.
+if (role === 'web' && !process.env.APP_URL && process.env.RENDER_EXTERNAL_URL) process.env.APP_URL = process.env.RENDER_EXTERNAL_URL;
 
 let child;
 let stopping = false;
