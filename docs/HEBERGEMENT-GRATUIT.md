@@ -13,7 +13,7 @@ Offres et consoles consultées le 12 octobre 2026. Contrainte retenue : aucune c
 
 Sources : [Render](https://render.com/docs/free), [Discloud](https://discloud.com/plans), [Aiven](https://aiven.io/docs/products/postgresql/concepts/pg-free-tier), [Upstash](https://upstash.com/pricing/redis).
 
-Railway est bloqué par un essai expiré. Northflank exige une carte même sur Sandbox : cette voie est abandonnée. La base initialement créée dans Aiven utilise Developer-1 couvert par des crédits d’essai ; elle doit impérativement passer sur **Free-1-1gb**. Les crédits d’essai ne sont pas une offre gratuite permanente.
+Railway est bloqué par un essai expiré. Northflank exige une carte même sur Sandbox : cette voie est abandonnée. La base Aiven a été passée de Developer-1 sur **Free-1-1gb** et son état Running est confirmé. Le bandeau de crédits d’essai reste affiché au niveau du compte ; le service PostgreSQL utilise bien le plan gratuit, avec vingt connexions maximum.
 
 ## Connexions et secrets
 
@@ -23,7 +23,7 @@ Utilisez le certificat CA fourni par Aiven et une connexion SQL chiffrée avec v
 
 ## Site Render
 
-Publiez le code dans un dépôt Git privé et connectez uniquement ce dépôt à Render. Créez manuellement un **Web Service**, environnement **Node 24**, région Francfort et instance **Free**, sans carte. Compilation :
+Le code est publié dans le [dépôt GitHub privé Atlas](https://github.com/lebgdu59165-lab/atlas-discord). L’application GitHub Render a été autorisée pour ce seul dépôt ; la connexion « Git Deployment Credentials » reste à terminer. Créez un **Web Service**, environnement **Node 24**, région Francfort et instance **Free**, sans carte. Compilation :
 
 ```sh
 npm ci --no-audit --no-fund && npm run build
@@ -51,9 +51,9 @@ Le bot est indépendant des visites du site, mais sa disponibilité permanente n
 
 ## Recette et état
 
-Redis réel : TLS, authentification, script de limitation et pub/sub vérifiés. Tests locaux : 16 unitaires et 14 PostgreSQL réussis. Compilation du site et du bot exécutée.
+Redis réel : TLS, authentification, script de limitation et pub/sub vérifiés. PostgreSQL Aiven réel : connexion authentifiée avec TLS et validation du certificat réussie ; migration initiale appliquée. Tests locaux : 16 unitaires et 14 PostgreSQL réussis. Compilation du site et du bot exécutée.
 
-Restent : confirmer Aiven Free, publier le dépôt et le web, passer la vérification Discloud, renseigner Discord, inviter le bot et mesurer la mémoire. Aucune URL Atlas publique ni session OAuth2 ou Gateway réelle n’est validée.
+Discloud est connecté et sa vérification humaine est terminée. Restent : terminer la liaison de déploiement GitHub dans Render, publier le web et le bot, renseigner Discord, inviter le bot et mesurer la mémoire. Aucune URL Atlas publique ni session OAuth2 ou Gateway réelle n’est validée.
 
 ```sh
 node scripts/check-production.mjs --cloud --discord

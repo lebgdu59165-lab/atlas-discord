@@ -14,11 +14,13 @@
 | Thèmes | Clair et sombre vérifiés ; contraste de la zone d’accueil corrigé. |
 | Discord, OAuth2 et Gateway réels | Non testés : aucun identifiant Discord fourni. |
 | Redis réel | Upstash Free créé : TLS, authentification, script de limitation et pub/sub vérifiés. |
+| PostgreSQL Aiven Free | Running, vingt connexions maximum ; authentification, TLS avec validation CA et migration initiale vérifiés. |
+| Dépôt GitHub | Code publié dans un dépôt privé ; application Render autorisée pour ce seul dépôt. Connexion de déploiement à terminer. |
 | Socket.IO avec navigateur authentifié réel | Non testé : identifiants Discord manquants. |
 | Bot compilé séparément | Compilation réussie ; paquet sans secrets préparé pour Discloud. |
 | Mémoire du bot | Environ 81 Mo avant Gateway et avec une connexion SQL locale ; tenue sous 100 Mo en charge non validée. |
 | Docker Compose | Non exécuté : Docker absent de l’environnement de réalisation. |
-| Configuration de déploiement | Secrets locaux générés sans affichage ; validation de production bloque sur les valeurs Discord et le domaine manquants. |
+| Configuration de déploiement | Connexions SQL/Redis locales privées configurées ; validation cloud bloque sur les quatre valeurs Discord et APP_URL public manquants. |
 | Déploiement Oracle | Script de lancement et guide préparés ; aucun compte ni serveur cloud créé. |
 | Cahier des charges à 100 % | Non satisfait : périmètre et fonctions manquantes dans docs/COUVERTURE.md. |
 
