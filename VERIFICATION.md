@@ -22,6 +22,7 @@
 | Bot compilé séparément | Compilation réussie ; paquet sans secrets avec lanceur Wispbyte Node.js 24. Installation des dépendances et génération Prisma exécutées sur l’hébergement. |
 | Mémoire du bot | Environ 82 Mio sur Wispbyte avec un serveur Discord rejoint ; environ 317 Mio de stockage. Mesure ponctuelle, charge et endurance non validées. |
 | Hébergement du bot Wispbyte | Serveur Atlas Discord 3fad2480, Free : 512 Mio de mémoire, 1 Gio de disque, 35 % d’un vCPU. Node.js 24.21.0 ; Gateway et heartbeat publics confirmés. Reconnexion au compte nécessaire toutes les deux semaines. |
+| Redémarrage Wispbyte | Réussi avec le lanceur final : installation verrouillée, génération Prisma, retour Gateway à un serveur et contrôle public des quatre services réussi. Environ 83 Mio de mémoire après reprise. Les branches de répétition et de réutilisation des dépendances n’ont pas été provoquées séparément. |
 | Hébergement du bot Discloud | Création refusée par le fournisseur : NO_CLUSTER, capacité Free saturée. Aucune application bot créée. |
 | Docker Compose | Non exécuté : Docker absent de l’environnement de réalisation. |
 | Configuration de déploiement | Validation cloud et token Discord réussis ; secrets Render et Wispbyte configurés avec autorisation. APP_URL public et NODE_ENV=production renseignés localement. |
