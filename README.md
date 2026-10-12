@@ -39,6 +39,6 @@ Ouvrez `http://localhost:3000`, connectez-vous avec Discord, invitez le bot puis
 
 ## Vérification effectuée
 
-Compilation Next.js et vérification TypeScript réussies. Tests de sécurité et tests d’intégration avec un véritable PostgreSQL réussis. L’intégration Discord est remplacée par une frontière contrôlée dans les tests d’autorisation : les interactions réelles, OAuth2, Redis/Socket.IO et le lancement Docker n’ont pas été validés avec des identifiants utilisateur. Docker n’est pas installé sur la machine de réalisation. Voir `docs/TESTS.md` pour les résultats exacts et la recette à exécuter.
+Le [site Atlas](https://atlas-dashboard-vf3d.onrender.com) est publié sur Render Free : accueil et contrôle de disponibilité répondent HTTP 200, avec PostgreSQL Aiven et Redis Upstash réels disponibles. Le token Discord et une connexion Gateway locale ont été vérifiés ; le bot n’est pas encore hébergé, car Discloud refuse les créations gratuites faute de capacité. Le parcours OAuth2 utilisateur et les interactions sur un vrai serveur restent à valider. Compilation Next.js, TypeScript, 16 tests unitaires et 14 tests PostgreSQL réussis. Docker n’est pas installé sur la machine. Voir `VERIFICATION.md`, `docs/HEBERGEMENT-GRATUIT.md` et `docs/COUVERTURE.md` pour l’état exact et les fonctions manquantes.
 
 Les secrets ne sont jamais inclus dans l’archive. `scripts/setup-env.mjs` génère les secrets locaux sans les imprimer. L’archive ne contient ni bases de données, ni dépendances installées, ni données de test.
