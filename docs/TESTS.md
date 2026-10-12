@@ -4,7 +4,7 @@
 
 Sur Node.js 24 sous Windows, le 12 octobre 2026 : compilation de production Next.js réussie, migration initiale appliquée à un PostgreSQL réel isolé, tests unitaires et d’intégration réussis. Le rapport final est dans `VERIFICATION.md`.
 
-Les tests d’intégration utilisent une vraie base PostgreSQL et une frontière Discord contrôlée. Ils ne prouvent pas qu’une hiérarchie réelle ou les actions du bot fonctionnent sur votre serveur. Les vérifications manuelles ultérieures ont confirmé le token Discord, le secret OAuth et une connexion Gateway avec zéro serveur rejoint. Le site est publié sur Render Free, connecté à PostgreSQL Aiven et Redis Upstash. Docker reste absent ; lancement Compose, session OAuth2 utilisateur et actions sur un vrai serveur restent à valider. Le bot hébergé est bloqué par la saturation du plan gratuit Discloud ; voir VERIFICATION.md.
+Les tests d’intégration utilisent une vraie base PostgreSQL et une frontière Discord contrôlée. Ils ne prouvent pas qu’une hiérarchie réelle ou les actions du bot fonctionnent sur votre serveur. Les vérifications manuelles ultérieures ont confirmé le token Discord, le secret OAuth et le bot Wispbyte connecté à un serveur Discord. Le site est publié sur Render Free, connecté à PostgreSQL Aiven et Redis Upstash ; le contrôle public de production valide également le heartbeat du bot. Docker reste absent ; lancement Compose, session OAuth2 utilisateur et actions sur un vrai serveur restent à valider. La disponibilité dans la durée n’est pas garantie ; voir VERIFICATION.md.
 
 ## Tests automatiques
 
