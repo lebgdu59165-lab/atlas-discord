@@ -1,0 +1,186 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+model User {
+  id String @id
+  name String
+  avatar String?
+  token String
+  refreshToken String
+  tokenExpiresAt DateTime
+  createdAt DateTime @default(now())
+  sessions Session[]
+}
+model Session {
+  id String @id
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  csrf String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  @@index([expiresAt])
+}
+model Guild {
+  id String @id
+  name String
+  icon String?
+  ownerId String
+  memberCount Int @default(0)
+  channels Int @default(0)
+  roles Int @default(0)
+  online Int?
+  installed Boolean @default(true)
+  updatedAt DateTime @updatedAt
+  configs Config[]
+  grants Grant[]
+  audits Audit[]
+  metrics Metric[]
+  cases Case[]
+  accounts Account[]
+  transactions Transaction[]
+  entities Entity[]
+  tickets Ticket[]
+  levels Level[]
+  jobs Job[]
+}
+model Config {
+  guildId String
+  module String
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  value Json
+  revision Int @default(1)
+  updatedAt DateTime @updatedAt
+  @@id([guildId, module])
+}
+model Grant {
+  guildId String
+  userId String
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  permissions String[]
+  @@id([guildId, userId])
+}
+model Audit {
+  id String @id @default(cuid())
+  guildId String
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  actorId String
+  action String
+  targetId String?
+  detail Json
+  createdAt DateTime @default(now())
+  @@index([guildId, createdAt])
+}
+model Metric {
+  guildId String
+  day String
+  kind String
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  count Int @default(0)
+  @@id([guildId, day, kind])
+}
+model Case {
+  id String @id @default(cuid())
+  guildId String
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  userId String
+  actorId String
+  kind String
+  reason String
+  expiresAt DateTime?
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([guildId, userId, createdAt])
+}
+model Account {
+  guildId String
+  userId String
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  wallet Int @default(0)
+  bank Int @default(0)
+  dailyAt DateTime?
+  weeklyAt DateTime?
+  workAt DateTime?
+  inventory Json @default("[]")
+  @@id([guildId, userId])
+}
+model Transaction {
+  id String @id @default(cuid())
+  guildId String
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  userId String
+  actorId String
+  amount Int
+  kind String
+  reason String
+  createdAt DateTime @default(now())
+  @@index([guildId, userId, createdAt])
+}
+model Entity {
+  id String @id @default(cuid())
+  guildId String
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  module String
+  title String
+  status String @default("draft")
+  data Json
+  ownerId String
+  revision Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([guildId, module, createdAt])
+}
+model Ticket {
+  id String @id @default(cuid())
+  guildId String
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  panelId String
+  userId String
+  channelId String? @unique
+  status String @default("opening")
+  priority String @default("normal")
+  assignedTo String?
+  participants String[] @default([])
+  answers Json @default("{}")
+  reason String?
+  transcript String?
+  rating Int?
+  firstResponseAt DateTime?
+  createdAt DateTime @default(now())
+  closedAt DateTime?
+  @@index([guildId, status])
+}
+model Level {
+  guildId String
+  userId String
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  xp Int @default(0)
+  lastMessageAt DateTime?
+  voiceSince DateTime?
+  @@id([guildId, userId])
+}
+model Job {
+  id String @id @default(cuid())
+  guildId String
+  guild Guild @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  actorId String
+  kind String
+  payload Json
+  status String @default("queued")
+  attempts Int @default(0)
+  runAt DateTime @default(now())
+  lockedAt DateTime?
+  error String?
+  result Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([status, runAt])
+}
+model GlobalSetting {
+  key String @id
+  value Json
+  updatedAt DateTime @updatedAt
+}
