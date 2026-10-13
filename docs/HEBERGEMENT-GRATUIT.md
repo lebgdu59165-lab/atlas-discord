@@ -21,6 +21,8 @@ Les deux services partagent DATABASE_URL, REDIS_URL, APP_URL, ENCRYPTION_KEY, DI
 
 Utilisez le certificat CA fourni par Aiven et une connexion SQL chiffrée avec validation du certificat. Limitez chaque processus à cinq connexions (`connection_limit=5`) et respectez le total autorisé dans la console. Redis doit utiliser `rediss://` avec un identifiant de lecture et écriture ; l’URL REST et le token de lecture seule ne conviennent pas.
 
+Sur Wispbyte, le certificat est placé dans `/home/container/certs/aiven-ca.pem`. Utilisez ce chemin absolu dans le paramètre `sslcert` de DATABASE_URL, avec `sslmode=require` et `sslaccept=strict` ; gardez le chemin local adapté à Windows dans le fichier local. Un fichier .env destiné au poste local ne doit pas être recopié tel quel si ses chemins dépendent du système.
+
 ## Site Render
 
 Le code est publié dans le [dépôt GitHub public Atlas](https://github.com/lebgdu59165-lab/atlas-discord), rendu public avec autorisation après contrôle de l’absence des secrets. Le Blueprint **Atlas Discord** a créé le Web Service **atlas-dashboard**, environnement **Node 24**, région Francfort et instance **Free**, sans carte. Le déploiement est **Live** sur [le site Atlas](https://atlas-dashboard-vf3d.onrender.com). Compilation :
@@ -47,7 +49,7 @@ Le fichier local utilise APP_URL=https://atlas-dashboard-vf3d.onrender.com et NO
 node scripts/start-wispbyte.mjs
 ```
 
-Le lanceur installe les dépendances verrouillées si leur fichier de verrouillage a changé, génère le client Prisma puis rejoint le bot dans le même processus. Il retente la génération jusqu’à trois fois en cas d’interruption. La première préparation a rencontré une coupure de téléchargement ; le redémarrage du fournisseur a permis de terminer la génération sans désactiver la validation TLS.
+Le lanceur installe les dépendances verrouillées si leur fichier de verrouillage a changé, puis réutilise le client Prisma si le schéma généré correspond au schéma courant et si un moteur natif existe pour le système. Sinon, il génère le client et retente jusqu’à trois fois en cas d’interruption. Le bot rejoint ensuite le même processus. Cette réutilisation évite de dépendre d’une préparation réseau à chaque redémarrage. La première préparation a rencontré une coupure de téléchargement ; le redémarrage du fournisseur a permis de terminer la génération sans désactiver la validation TLS.
 
 Le bot s’exécute dans un seul processus, sans compilateur TypeScript ni migration au démarrage. Ne lancez qu’une seule instance ; arrêtez l’ancienne avant une mise à jour pour éviter les événements doubles.
 

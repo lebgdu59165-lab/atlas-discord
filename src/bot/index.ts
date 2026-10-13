@@ -15,7 +15,7 @@ const client=new Client({intents});
 async function track(guild:Guild) {
   await db.guild.upsert({where:{id:guild.id},create:{id:guild.id,name:guild.name,ownerId:guild.ownerId,icon:guild.icon,memberCount:guild.memberCount,channels:guild.channels.cache.size,roles:guild.roles.cache.size},update:{name:guild.name,ownerId:guild.ownerId,icon:guild.icon,memberCount:guild.memberCount,channels:guild.channels.cache.size,roles:guild.roles.cache.size,installed:true,online:process.env.DISCORD_PRESENCE_INTENT==='true'?guild.presences.cache.filter(p=>p.status!=='offline').size:null}});
 }
-const safe=(fn:(...args:any[])=>Promise<any>)=>(...args:any[])=>void fn(...args).catch(e=>console.error('Bot event failed:',e instanceof AppError?e.message:e?.name ?? 'UnknownError'));
+const safe=(fn:(...args:any[])=>Promise<any>)=>(...args:any[])=>void fn(...args).catch(e=>console.error('Bot event failed:',e instanceof AppError?e.message:e?.name ?? 'UnknownError',/^P\d{4}$/.test(e?.errorCode??e?.code??'')?(e.errorCode??e.code):''));
 client.once(Events.ClientReady,safe(async()=>{
   for(const guild of client.guilds.cache.values())await track(guild);
   await db.job.updateMany({where:{status:'running',lockedAt:{lt:new Date(Date.now()-300000)}},data:{status:'failed',error:'Exécution interrompue : vérifier Discord avant de relancer manuellement.'}});

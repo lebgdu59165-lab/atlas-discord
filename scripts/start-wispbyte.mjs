@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { setTimeout as pause } from 'node:timers/promises';
+import { prismaClientReady } from './prisma-ready.mjs';
 
 // Wispbyte lance ce fichier directement, avant l'installation des dépendances.
 // Le bot rejoint ensuite le même processus, sans lanceur permanent supplémentaire.
@@ -23,15 +24,17 @@ if (installedHash !== lockHash) {
 }
 
 // Une coupure du téléchargement ne force pas la réinstallation des dépendances.
-let generationCode = 1;
-for (let attempt = 0; attempt < 3; attempt++) {
-  generationCode = await runNpm(['run', 'db:generate']);
-  if (generationCode === 0) break;
-  if (attempt < 2) {
-    console.error('Génération Prisma interrompue ; nouvelle tentative dans cinq secondes.');
-    await pause(5000);
+if(!await prismaClientReady()){
+  let generationCode = 1;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    generationCode = await runNpm(['run', 'db:generate']);
+    if (generationCode === 0) break;
+    if (attempt < 2) {
+      console.error('Génération Prisma interrompue ; nouvelle tentative dans cinq secondes.');
+      await pause(5000);
+    }
   }
-}
-if (generationCode !== 0) process.exit(generationCode);
+  if (generationCode !== 0) process.exit(generationCode);
+}else console.log('Client Prisma déjà généré pour ce schéma ; lancement direct du bot.');
 
 await import('./start-discloud.mjs');

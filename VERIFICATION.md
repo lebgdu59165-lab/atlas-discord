@@ -31,7 +31,7 @@
 
 ## Notifications Twitch — 13 octobre 2026
 
-Compilation Next.js et du bot, vérification TypeScript, 23 tests unitaires et 19 tests PostgreSQL isolés réussis après ajout de Twitch. Les cinq tests SQL supplémentaires vérifient la concurrence, la persistance du dédoublonnage, l’annulation après désactivation, le refus d’un salon d’un autre serveur et une livraison réussie sans seconde publication. La base locale de recette utilise explicitement UTF-8, afin de tester les messages contenant des emojis.
+Compilation Next.js et du bot, vérification TypeScript, 24 tests unitaires et 19 tests PostgreSQL isolés réussis après ajout de Twitch et correction du démarrage. Le test de lancement exige un schéma correspondant et un moteur natif avant de réutiliser le client Prisma. Les cinq tests SQL supplémentaires vérifient la concurrence, la persistance du dédoublonnage, l’annulation après désactivation, le refus d’un salon d’un autre serveur et une livraison réussie sans seconde publication. La base locale de recette utilise explicitement UTF-8, afin de tester les messages contenant des emojis.
 
 Authentification et validation du jeton Twitch réels réussies ; raskuoff est hors ligne lors du contrôle. Salon cible 1395698905378983939 confirmé textuel dans The Rasku Family. Les clés sont conservées hors du dépôt. Publication de la version et surveillance sur l’hébergement à confirmer ; première annonce d’un live réel encore à vérifier.
 

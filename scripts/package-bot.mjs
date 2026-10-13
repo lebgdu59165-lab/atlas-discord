@@ -3,7 +3,7 @@ import {resolve,dirname} from 'node:path';
 
 const output=resolve('../atlas-bot-discloud');
 const pkg=JSON.parse(await readFile('package.json','utf8'));
-for(const file of ['bot-build/index.mjs','bot-build/index.mjs.LEGAL.txt','scripts/start-discloud.mjs','scripts/start-wispbyte.mjs','scripts/check-production.mjs','prisma/schema.prisma','certs/aiven-ca.pem','discloud.config','.env.example','.gitignore','.discloudignore']){
+for(const file of ['bot-build/index.mjs','bot-build/index.mjs.LEGAL.txt','scripts/start-discloud.mjs','scripts/start-wispbyte.mjs','scripts/prisma-ready.mjs','scripts/check-production.mjs','prisma/schema.prisma','certs/aiven-ca.pem','discloud.config','.env.example','.gitignore','.discloudignore']){
   const destination=resolve(output,file);await mkdir(dirname(destination),{recursive:true});await copyFile(file,destination);
 }
 await writeFile(resolve(output,'package.json'),JSON.stringify({name:'atlas-bot-discloud',version:pkg.version,private:true,type:'module',engines:{node:'>=22.12'},scripts:{start:'node scripts/start-discloud.mjs','db:generate':'prisma generate'},dependencies:Object.fromEntries(['@prisma/client','prisma','dotenv'].map(key=>[key,pkg.dependencies[key]])),overrides:pkg.overrides},null,2)+'\n');
