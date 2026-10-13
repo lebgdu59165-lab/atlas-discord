@@ -55,7 +55,7 @@ Le bot s’exécute dans un seul processus, sans compilateur TypeScript ni migra
 
 Le journal Wispbyte confirme `Atlas connected: 1 guilds`. La console indique environ **82 Mio de mémoire** et **317 Mio de disque** avec un serveur rejoint, sous Node.js 24.21.0. Ces mesures ponctuelles ne valident ni les actions Discord, ni la tenue en charge. La version du bot envoyée est un paquet compilé ; une modification du dépôt GitHub ne met pas automatiquement ce paquet à jour.
 
-Reconnectez-vous à [Wispbyte](https://wispbyte.com/client/dashboard) au moins toutes les deux semaines pour garder le serveur gratuit actif. Les conditions indiquent une interruption après inactivité et un déplacement du stockage après trente jours. Le bot reste indépendant de la mise en veille Render ; cette offre ne garantit pas une disponibilité continue. Aucun dispositif artificiel pour contourner la mise en veille Render n’est configuré.
+Reconnectez-vous à [Wispbyte](https://wispbyte.com/client/dashboard) au moins toutes les deux semaines pour garder le serveur gratuit actif. Certains démarrages nécessitent une publicité à regarder dans le panneau : cette étape a été observée le 13 octobre. Les conditions indiquent une interruption après inactivité et un déplacement du stockage après trente jours. Le bot reste indépendant de la mise en veille Render ; cette offre ne garantit pas une disponibilité continue. Aucun dispositif artificiel pour contourner la mise en veille Render n’est configuré.
 
 ## Tentative Discloud précédente
 

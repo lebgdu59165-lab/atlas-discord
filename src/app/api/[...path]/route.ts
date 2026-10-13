@@ -165,7 +165,9 @@ async function handler(req:Request,{params}:{params:Promise<{path:string[]}>}) {
         db.entity.findFirst({where:{guildId,module:'twitch-delivery',status:'done'},orderBy:{updatedAt:'desc'},select:{data:true}}),
         db.job.findFirst({where:{guildId,kind:'twitchLive'},orderBy:{createdAt:'desc'},select:{status:true,error:true}})
       ]);
-      return response({runtime:runtime?.data??null,lastDelivery:lastDelivery?.data??null,lastJob});
+      const runtimeData=runtime?.data as any;
+      const age=Date.now()-Date.parse(runtimeData?.checkedAt??'');
+      return response({runtime:runtimeData??null,monitoring:age>=-30000&&age<=120000,lastDelivery:lastDelivery?.data??null,lastJob});
     }
     if(b==='security') {
       if(!auth.admin) throw new AppError(403,'Seul un administrateur Discord peut modifier les accès.');
