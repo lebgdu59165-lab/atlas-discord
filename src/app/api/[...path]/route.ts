@@ -158,6 +158,15 @@ async function handler(req:Request,{params}:{params:Promise<{path:string[]}>}) {
     }
     if(b==='logs') return response(await db.audit.findMany({where:{guildId,...(url.searchParams.get('q')?{action:{contains:url.searchParams.get('q')!,mode:'insensitive'}}:{})},orderBy:{createdAt:'desc'},take:200}));
     if(b==='jobs') return response(await db.job.findMany({where:{guildId},orderBy:{createdAt:'desc'},take:100}));
+    if(b==='twitch-status'&&method==='GET') {
+      await authorize(guildId,actor,'content');
+      const [runtime,lastDelivery,lastJob]=await Promise.all([
+        db.entity.findFirst({where:{id:`twitch-status:${guildId}`,guildId,module:'twitch-status'},select:{data:true}}),
+        db.entity.findFirst({where:{guildId,module:'twitch-delivery',status:'done'},orderBy:{updatedAt:'desc'},select:{data:true}}),
+        db.job.findFirst({where:{guildId,kind:'twitchLive'},orderBy:{createdAt:'desc'},select:{status:true,error:true}})
+      ]);
+      return response({runtime:runtime?.data??null,lastDelivery:lastDelivery?.data??null,lastJob});
+    }
     if(b==='security') {
       if(!auth.admin) throw new AppError(403,'Seul un administrateur Discord peut modifier les accès.');
       if(method==='GET') return response(await db.grant.findMany({where:{guildId}}));

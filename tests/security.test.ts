@@ -17,7 +17,7 @@ describe('Authorization and input boundaries',()=>{
   it('requests timeout capability without requesting Administrator',()=>{const permissions=BigInt(new URL(botInvite()).searchParams.get('permissions')!);expect(permissions & (1n<<40n)).not.toBe(0n);expect(permissions & 8n).toBe(0n);});
   it('rejects unknown config keys and malformed Discord IDs',()=>{expect(configSchema('moderation').safeParse({enabled:true,dm:true,requireReason:true,logChannelId:'',moderatorRoles:[],guildId:'foreign'}).success).toBe(false);expect(recordSchema('tickets').safeParse({description:'x',color:'#123456',channelId:'123',buttonLabel:'open'}).success).toBe(false);});
   it('never accepts scripts as automation actions',()=>{expect(recordSchema('automations').safeParse({trigger:'join',threshold:0,action:'eval',roleId:'',channelId:'',message:'',amount:0,enabled:true}).success).toBe(false);});
-  it('catalog explicitly identifies unimplemented extensions',()=>{expect(modules.find(m=>m.id==='music')?.status).toBe('unavailable');expect(modules.find(m=>m.id==='integrations')?.status).toBe('unavailable');});
+  it('catalog explicitly identifies unimplemented extensions',()=>{expect(modules.find(m=>m.id==='music')?.status).toBe('unavailable');const integrations=modules.find(m=>m.id==='integrations');expect(integrations?.status).toBe('partial');expect(integrations?.limitation).toContain('YouTube, RSS et webhooks restent à développer');});
 });
 describe('Untrusted content',()=>{
   it('blocks internal HTTP destinations including metadata and IPv6',()=>{for(const ip of ['127.0.0.1','169.254.169.254','10.0.0.1','172.16.4.5','192.168.1.1','100.64.1.1','::1','0.0.0.0'])expect(publicIPv4(ip)).toBe(false);expect(publicIPv4('8.8.8.8')).toBe(true);});

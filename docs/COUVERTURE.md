@@ -200,13 +200,13 @@ Reste à réaliser / limites : Appels à un fournisseur compatible OpenAI, quota
 
 Page : `/dashboard/:guildId/ai` (accès contrôlé).
 
-### Intégrations — indisponible
+### Intégrations — partiel
 
-Aucun connecteur RSS/Twitch/YouTube/webhook. Page explicitement indisponible.
+Annonces Twitch par le bot : chaîne, salon et message configurables, détection toutes les minutes via l’API officielle, dédoublonnage persistant par live et serveur, état du contrôle et dernière annonce. Les clés Twitch restent privées sur le bot.
 
-Reste à réaliser / limites : RSS, Twitch, YouTube et webhooks authentifiés ne sont pas implémentés. Les messages programmés sont disponibles dans Embed Builder.
+Reste à réaliser / limites : RSS, YouTube et webhooks authentifiés non implémentés. Un live très bref peut être manqué entre deux contrôles. Première notification d’un live réel encore à vérifier.
 
-Page : `/dashboard/:guildId/integrations` (notice d’indisponibilité).
+Page : `/dashboard/:guildId/integrations` (accès contrôlé).
 
 ### Paramètres du serveur — implémenté
 
@@ -252,7 +252,7 @@ Les tests et la procédure de recette de **chaque module** figurent dans [TESTS.
 - FiveM : le suivi RP sauvegarde des documents typés, sans automatiser les entreprises, factions, grades ou promotions dans le jeu. Pas de ressource Lua, API authentifiée dédiée ou collecte des logs RP du serveur.
 - Staff : pas d’évaluations, sanctions internes, présence vocale ou rapports statistiques complets.
 - IA : pas de résumé automatique de ticket, suivi du coût monétaire ou index documentaire. Le modèle et le fournisseur doivent être configurés.
-- Musique et intégrations externes : non implémentées.
+- Musique, RSS, YouTube et webhooks externes : non implémentés. Les annonces Twitch sont disponibles ; voir TWITCH.md.
 - Global : pas de gestion d’administrateurs système secondaires, déploiement web des mises à jour, quotas globaux ou gestion multilingue.
 - Interface : navigation et recherche de modules, thème et responsive implémentés ; la sidebar devient un tiroir mobile, sans mode réduit à icônes sur desktop.
 - Journal : connexions OAuth2 non associées à chaque serveur, attribution des invitations et logs exhaustifs de pseudos non collectés.

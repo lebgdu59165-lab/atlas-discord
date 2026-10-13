@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { twitchLogin, TWITCH_MESSAGE } from '../lib/twitch';
 export type Field = { key: string; label: string; type: 'text' | 'textarea' | 'number' | 'boolean' | 'select' | 'ids' | 'color'; default: unknown; options?: string[]; min?: number; max?: number; hint?: string };
 const text = (key: string, label: string, value = '', hint?: string): Field => ({ key, label, type: 'text', default: value, hint });
 const area = (key: string, label: string, value = ''): Field => ({ key, label, type: 'textarea', default: value });
@@ -38,7 +39,7 @@ export const modules: Module[] = [
   { id:'fivem', label:'FiveM / RP', group:'Extensions', description:'Statut, whitelist, factions et services RP.', status:'partial', limitation:'Endpoint public de statut et suivis RP web disponibles. Pas de ressource FiveM ni de webhook de jeux fourni.', fields:[bool('enabled','Activer FiveM'),text('statusUrl','URL HTTPS publique du serveur (info.json / players.json)'),text('connectAddress','Adresse de connexion'),num('refreshSeconds','Actualisation (secondes)',60,30,3600)],recordFields:[select('type','Type',['whitelist','faction','entreprise','absence','rapport']),text('userId','Membre'),text('grade','Grade / métier'),area('description','Détails'),text('startsAt','Début ISO 8601 (facultatif)'),text('endsAt','Fin ISO 8601 (facultatif)')] },
   { id:'music', label:'Musique', group:'Extensions', description:'Audio et panneau de contrôle.', status:'unavailable', limitation:'Le moteur audio n’est pas implémenté. Aucun bouton ne prétend lancer de musique.', fields:[] },
   { id:'ai', label:'Assistant IA', group:'Extensions', description:'Réponses à partir d’une base de connaissances.', status:'partial', limitation:'Appels à un fournisseur compatible OpenAI, quota de requêtes et consentement disponibles. Résumés de tickets et mesure des coûts monétaires non implémentés.', fields:[bool('enabled','Activer l’assistant'),bool('allowExternalData','Autoriser l’envoi du texte au fournisseur'),text('model','Identifiant du modèle'),num('dailyLimit','Requêtes quotidiennes par serveur',50,1,10000),num('maxOutputTokens','Limite de sortie',500,50,4000),area('knowledge','Base de connaissances')] },
-  { id:'integrations', label:'Intégrations', group:'Extensions', description:'Messages programmés et services externes.', status:'unavailable', limitation:'RSS, Twitch, YouTube et webhooks authentifiés ne sont pas implémentés. Les messages programmés sont disponibles dans Embed Builder.', fields:[] },
+  { id:'integrations', label:'Intégrations', group:'Extensions', description:'Annonces automatiques de vos lives Twitch.', status:'partial', limitation:'Twitch est vérifié toutes les minutes par le bot, avec une annonce par live. YouTube, RSS et webhooks restent à développer.', fields:[bool('enabled','Annoncer les lives Twitch'),text('twitchLogin','Chaîne Twitch','','Nom de la chaîne ou lien https://www.twitch.tv/…'),channel,{...area('liveMessage','Message du live',TWITCH_MESSAGE),hint:'Variables : {name}, {title}, {game}, {url}. Les mentions ne déclenchent aucune notification de groupe.'}] },
   { id:'settings', label:'Paramètres du serveur', group:'Système', description:'Personnalisation du tableau de bord.', status:'implemented', fields:[text('displayName','Nom affiché'),select('language','Langue',['fr']),color,select('theme','Thème',['dark','light'])] },
   { id:'security', label:'Sécurité', group:'Système', description:'Accès délégués et contrôle des permissions.', status:'implemented', fields:[] },
   { id:'data', label:'Gestion des données', group:'Système', description:'Export, conservation et suppression des données.', status:'implemented', fields:[] },
@@ -48,6 +49,8 @@ export const byId = (id: string) => modules.find(m => m.id === id);
 export const snowflake = z.string().regex(/^\d{17,20}$/, 'Identifiant Discord invalide');
 export const defaults = (fields: Field[]) => Object.fromEntries(fields.map(f => [f.key, f.default]));
 export function fieldSchema(f: Field): z.ZodTypeAny {
+  if(f.key==='twitchLogin')return z.string().max(128).refine(value=>{if(!value.trim())return true;try{twitchLogin(value);return true;}catch{return false;}},'Chaîne Twitch invalide').transform(value=>value.trim()?twitchLogin(value):'');
+  if(f.key==='liveMessage')return z.string().trim().min(1).max(1600);
   if (f.type === 'boolean') return z.boolean();
   if (f.type === 'number') return z.number().int().min(f.min ?? 0).max(f.max ?? 1000000);
   if (f.type === 'ids') return z.array(snowflake).max(100);
@@ -62,7 +65,11 @@ export function fieldSchema(f: Field): z.ZodTypeAny {
 export function schema(fields: Field[]) {
   return z.object(Object.fromEntries(fields.map(f => [f.key, fieldSchema(f)]))).strict();
 }
-export const configSchema = (id: string) => schema(byId(id)?.fields ?? []);
+export const configSchema = (id: string) => schema(byId(id)?.fields ?? []).superRefine((value,ctx)=>{
+  if(id==='integrations'&&value.enabled){
+    for(const key of ['twitchLogin','channelId'])if(!value[key])ctx.addIssue({code:'custom',path:[key],message:'Ce champ est requis pour activer les annonces Twitch.'});
+  }
+});
 export const recordSchema = (id: string) => schema(byId(id)?.recordFields ?? []);
 export const permissionNames = ['config','moderation','tickets','members','roles','levels','economy','content','staff','logs','security','data'] as const;
 export type Permission = typeof permissionNames[number];

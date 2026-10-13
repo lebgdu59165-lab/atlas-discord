@@ -6,6 +6,7 @@ import { config, json, metric, audit, cleanup } from '../services/store';
 import { AppError } from '../lib/errors';
 import { variables, levelOf } from '../shared/catalog';
 import { execute, openTicket, ticketAction, setRole, sanction, sendText, automation } from './actions';
+import { pollTwitch } from './twitch';
 const intents=[GatewayIntentBits.Guilds,GatewayIntentBits.GuildMessages,GatewayIntentBits.GuildVoiceStates];
 if(process.env.DISCORD_MEMBERS_INTENT==='true')intents.push(GatewayIntentBits.GuildMembers);
 if(process.env.DISCORD_MESSAGE_CONTENT_INTENT==='true')intents.push(GatewayIntentBits.MessageContent);
@@ -21,7 +22,9 @@ client.once(Events.ClientReady,safe(async()=>{
   setInterval(safe(heartbeat),15000).unref();setInterval(safe(work),1000).unref();setInterval(safe(expireBans),30000).unref();
   setInterval(safe(async()=>{for(const guild of client.guilds.cache.values())await track(guild);}),60000).unref();
   setInterval(safe(cleanup),3600000).unref();setInterval(safe(closeDue),60000).unref();
+  setInterval(safe(()=>pollTwitch(client)),60000).unref();
   await heartbeat();console.log(`Atlas connected: ${client.guilds.cache.size} guilds`);
+  safe(()=>pollTwitch(client))();
 }));
 async function heartbeat(){await db.globalSetting.upsert({where:{key:'botHeartbeat'},create:{key:'botHeartbeat',value:json({at:Date.now(),latency:client.ws.ping,intents:process.env.DISCORD_MESSAGE_CONTENT_INTENT==='true'})},update:{value:json({at:Date.now(),latency:client.ws.ping,intents:process.env.DISCORD_MESSAGE_CONTENT_INTENT==='true'})}});}
 let busy=false;
@@ -37,7 +40,13 @@ async function work(){
     });
     if(!job)return;
     try {const result=await execute(client,job);await db.job.update({where:{id:job.id},data:{status:'done',result:json(result ?? {ok:true})}});await audit(job.guildId,job.actorId,`job.${job.kind}.done`,{jobId:job.id});}
-    catch(error){const message=error instanceof AppError?error.message:'Échec Discord ou base de données. Vérifiez si l’action a été appliquée avant de la relancer.';await db.job.update({where:{id:job.id},data:{status:'failed',error:message}});await audit(job.guildId,job.actorId,`job.${job.kind}.failed`,{jobId:job.id,error:message});}
+    catch(error){
+      const message=error instanceof AppError?error.message:'Échec Discord ou base de données. Vérifiez si l’action a été appliquée avant de la relancer.';
+      const retry=job.kind==='twitchLive'&&!(error instanceof AppError)&&job.attempts<3&&Date.now()-job.createdAt.getTime()<120000;
+      await db.job.update({where:{id:job.id},data:{status:retry?'queued':'failed',error:message,...(retry?{runAt:new Date(Date.now()+15000),lockedAt:null}:{})}});
+      if(job.kind==='twitchLive'&&!retry)await db.entity.updateMany({where:{id:job.id,guildId:job.guildId,status:'queued'},data:{status:'failed'}});
+      await audit(job.guildId,job.actorId,`job.${job.kind}.${retry?'retry':'failed'}`,{jobId:job.id,error:message});
+    }
     await publish(job.guildId,'jobs');
   }finally{busy=false;}
 }

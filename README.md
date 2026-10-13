@@ -9,6 +9,7 @@ Stack : Next.js 16, React 19, TypeScript, Tailwind 4, Radix Dialog, Node.js 24, 
 - [Hébergement gratuit Oracle et déploiement HTTPS](docs/HEBERGEMENT.md)
 - [Architecture, sécurité et API](docs/ARCHITECTURE.md)
 - [Tests automatisés et recette Discord](docs/TESTS.md)
+- [Notifications automatiques Twitch](docs/TWITCH.md)
 - [Couverture et développements restants](docs/COUVERTURE.md)
 
 ## Démarrage

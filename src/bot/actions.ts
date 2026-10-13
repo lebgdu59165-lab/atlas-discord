@@ -5,6 +5,7 @@ import { authorize } from '../lib/auth';
 import { config, json, audit, metric, getRecord } from '../services/store';
 import { variables, permissionFor, type Permission } from '../shared/catalog';
 import { publish } from '../lib/redis';
+import { deliverTwitchLive } from './twitch';
 export const escapeHtml=(s:string)=>s.replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]!));
 async function me(guild:Guild,permission:bigint) {
   const bot=await guild.members.fetchMe();if(!bot.permissions.has(permission)) throw new AppError(403,'Le bot ne dispose pas de la permission Discord requise.');return bot;
@@ -129,6 +130,7 @@ export async function automation(guild:Guild,trigger:string,userId:string,value=
   }
 }
 export async function execute(client:Client,job:any) {
+  if(job.kind==='twitchLive')return deliverTwitchLive(client,job);
   const guild=await client.guilds.fetch(job.guildId),p=job.payload;
   const perms:Record<string,Permission>={moderation:'moderation',roles:['addRole','removeRole'].includes(p.action)?'members':'roles',ticket:'tickets',publish:'content',syncCommands:'content',verifyPanel:'config',recruitmentAccept:'content'};
   if(job.kind!=='shopRole')await authorize(guild.id,job.actorId,perms[job.kind]??'content');
