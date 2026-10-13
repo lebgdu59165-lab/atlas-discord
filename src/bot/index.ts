@@ -123,7 +123,7 @@ client.on(Events.InteractionCreate,safe(async interaction=>{
       await interaction.deferReply({flags:64});
       if(interaction.customId==='verify'){const c=await config(interaction.guildId!,'autoroles');if(!c.value.enabled||!c.value.verifiedRoleId)throw new AppError(409,'Vérification désactivée.');await setRole(interaction.guild,interaction.user.id,String(c.value.verifiedRoleId),true);await interaction.editReply('Votre règlement a été accepté.');}
       else if(interaction.customId.startsWith('ticket:open:')){const id=interaction.customId.slice(12),channel=await openTicket(interaction.guild,interaction.user.id,id);await interaction.editReply(`Votre ticket : <#${channel}>`);}
-      else if(interaction.customId.startsWith('ticket:close:')){await ticketAction(interaction.guild,interaction.user.id,{action:'close',id:interaction.customId.slice(13),reason:'Fermé depuis Discord'},true);await interaction.editReply('Ticket fermé.');}
+      else if(interaction.customId.startsWith('ticket:close:')){const result=await ticketAction(interaction.guild,interaction.user.id,{action:'close',id:interaction.customId.slice(13),reason:'Fermé depuis Discord'},true,()=>interaction.editReply('Transcription sauvegardée. Suppression du salon en cours…'));if(!result.deleted)await interaction.editReply('Ticket fermé.');}
       else await interaction.editReply('Bouton inconnu ou expiré.');
     }
     if(interaction.isChatInputCommand()) {

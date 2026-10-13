@@ -84,7 +84,7 @@ export async function openTicket(guild:Guild,userId:string,panelId:string) {
     const bot=await me(guild,PermissionFlagsBits.ManageChannels);
     const channel=await guild.channels.create({name:`ticket-${ticket.id.slice(-8)}`,type:ChannelType.GuildText,parent:String(c.value.categoryId)||undefined,permissionOverwrites:[{id:guild.id,deny:[PermissionFlagsBits.ViewChannel]},{id:userId,allow:[PermissionFlagsBits.ViewChannel,PermissionFlagsBits.SendMessages,PermissionFlagsBits.ReadMessageHistory]},{id:bot.id,allow:[PermissionFlagsBits.ViewChannel,PermissionFlagsBits.SendMessages,PermissionFlagsBits.ReadMessageHistory,PermissionFlagsBits.ManageChannels]},...(c.value.supportRoles as string[]).map(id=>({id,allow:[PermissionFlagsBits.ViewChannel,PermissionFlagsBits.SendMessages,PermissionFlagsBits.ReadMessageHistory]}))]});
     await db.ticket.update({where:{id:ticket.id},data:{channelId:channel.id,status:'open'}});
-    await channel.send({content:`<@${userId}> Votre ticket est ouvert. La conservation du contenu dépend des paramètres de confidentialité du serveur.`,components:[new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId(`ticket:close:${ticket.id}`).setLabel('Fermer le ticket').setStyle(ButtonStyle.Secondary))],allowedMentions:{users:[userId]}});
+    await channel.send({content:`<@${userId}> Votre ticket est ouvert. La conservation du contenu dépend des paramètres de confidentialité du serveur.${c.value.deleteOnClose?' La fermeture supprimera ce salon après sauvegarde de la transcription.':''}`,components:[new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId(`ticket:close:${ticket.id}`).setLabel(c.value.deleteOnClose?'Fermer et supprimer':'Fermer le ticket').setStyle(ButtonStyle.Secondary))],allowedMentions:{users:[userId]}});
     await metric(guild.id,'ticketsOpened');await audit(guild.id,userId,'ticket.open',{},ticket.id);await publish(guild.id,'tickets');return channel.id;
   }catch(error){await db.ticket.update({where:{id:ticket.id},data:{status:'failed',reason:'Création du salon Discord échouée'}});throw error;}
 }
@@ -94,17 +94,37 @@ async function transcript(channel:TextChannel,content:boolean) {
   messages.sort((a,b)=>a.createdTimestamp-b.createdTimestamp);
   return `<!doctype html><html lang="fr"><meta charset="utf-8"><title>Transcription</title><style>body{font:15px system-ui;background:#11121a;color:#ddd;max-width:900px;margin:40px auto}article{padding:12px;border-bottom:1px solid #333}time{color:#999}p{white-space:pre-wrap}</style><h1>${escapeHtml(channel.name)}</h1>${truncated?'<p>Transcription limitée aux 5 000 derniers messages.</p>':''}${messages.map(m=>`<article><b>${escapeHtml(m.author.username)} (${escapeHtml(m.author.id)})</b> <time>${new Date(m.createdTimestamp).toISOString()}</time><p>${content?escapeHtml(m.content):'[Contenu non conservé selon la politique du serveur]'}</p>${content?Array.from(m.attachments.values()).map((a:any)=>`<p>Pièce jointe : ${escapeHtml(a.name??'fichier')}</p>`).join(''):''}</article>`).join('')}</html>`;
 }
-export async function ticketAction(guild:Guild,actorId:string,p:any,ownerAllowed=false) {
-  const t=await db.ticket.findFirst({where:{id:p.id,guildId:guild.id}});if(!t?.channelId)throw new AppError(404,'Ticket introuvable.');
+const ticketActions=new Map<string,Promise<void>>();
+export async function ticketAction(guild:Guild,actorId:string,p:any,ownerAllowed=false,beforeDelete?:()=>Promise<unknown>) {
+  const key=`${guild.id}:${p.id}`,previous=ticketActions.get(key);
+  let release!:()=>void;const current=new Promise<void>(resolve=>{release=resolve;});ticketActions.set(key,current);
+  await previous;
+  try{return await performTicketAction(guild,actorId,p,ownerAllowed,beforeDelete);}
+  finally{release();if(ticketActions.get(key)===current)ticketActions.delete(key);}
+}
+async function performTicketAction(guild:Guild,actorId:string,p:any,ownerAllowed:boolean,beforeDelete?:()=>Promise<unknown>) {
+  const t=await db.ticket.findFirst({where:{id:p.id,guildId:guild.id}});if(!t)throw new AppError(404,'Ticket introuvable.');
   if(ownerAllowed && t.userId!==actorId)await authorize(guild.id,actorId,'tickets');
-  const channel=await guild.channels.fetch(t.channelId);if(!channel || channel.type!==ChannelType.GuildText)throw new AppError(404,'Le salon du ticket a disparu.');
+  if(!t.channelId)throw new AppError(409,'Le salon a été supprimé. La transcription reste disponible ; ouvrez un nouveau ticket si nécessaire.');
+  const channel=await guild.channels.fetch(t.channelId);if(!channel || channel.type!==ChannelType.GuildText || channel.guildId!==guild.id)throw new AppError(404,'Le salon du ticket a disparu.');
+  let deleted=false;
   if(p.action==='claim') {const changed=await db.ticket.updateMany({where:{id:t.id,guildId:guild.id,status:'open',assignedTo:null},data:{assignedTo:actorId}});if(!changed.count)throw new AppError(409,'Ce ticket est déjà attribué ou fermé.');}
   else if(p.action==='close') {
-    if(t.status!=='open')throw new AppError(409,'Ticket déjà fermé.');
-    const c=await config(guild.id,'logs'),html=await transcript(channel,Boolean(c.value.storeMessageContent));
-    await channel.permissionOverwrites.edit(t.userId,{SendMessages:false});
-    await db.ticket.update({where:{id:t.id},data:{status:'closed',closedAt:new Date(),reason:p.reason||'Fermeture demandée',transcript:html}});
-    await metric(guild.id,'ticketsClosed');await sendText(guild,channel.id,`Ticket fermé : ${p.reason||'Fermeture demandée'}`);
+    const settings=await config(guild.id,'tickets'),remove=Boolean(settings.value.deleteOnClose);
+    if(t.status!=='open' && !(t.status==='closed' && remove && t.transcript))throw new AppError(409,'Ticket déjà fermé.');
+    if(remove){const bot=await guild.members.fetchMe();if(!channel.permissionsFor(bot)?.has(PermissionFlagsBits.ManageChannels))throw new AppError(403,'Le bot a besoin de la permission Gérer les salons pour supprimer ce ticket.');}
+    if(t.status==='open'){
+      const c=await config(guild.id,'logs'),html=await transcript(channel,Boolean(c.value.storeMessageContent));
+      await channel.permissionOverwrites.edit(t.userId,{SendMessages:false});
+      // Persist the transcript before any irreversible Discord deletion.
+      await db.ticket.update({where:{id:t.id},data:{status:'closed',closedAt:new Date(),reason:p.reason||'Fermeture demandée',transcript:html}});
+      await metric(guild.id,'ticketsClosed');
+    }
+    if(remove){
+      await beforeDelete?.();
+      try{await channel.delete(`Ticket fermé par ${actorId}`);}catch{throw new AppError(502,'Transcription sauvegardée, mais le salon n’a pas pu être supprimé. Réessayez la fermeture.');}
+      await db.ticket.update({where:{id:t.id},data:{channelId:null}});deleted=true;
+    }else await sendText(guild,channel.id,`Ticket fermé : ${p.reason||'Fermeture demandée'}`);
   }else if(p.action==='reopen'){if(t.status!=='closed')throw new AppError(409,'Le ticket n’est pas fermé.');await channel.permissionOverwrites.edit(t.userId,{SendMessages:true});await db.ticket.update({where:{id:t.id},data:{status:'open',closedAt:null}});}
   else if(['addParticipant','removeParticipant'].includes(p.action)) {
     if(!p.userId)throw new AppError(400,'Membre requis.');
@@ -114,7 +134,7 @@ export async function ticketAction(guild:Guild,actorId:string,p:any,ownerAllowed
     await db.ticket.update({where:{id:t.id},data:{participants:p.action==='addParticipant'?[...new Set([...t.participants,p.userId])]:t.participants.filter(x=>x!==p.userId)}});
   }else if(p.action==='priority'){if(!p.priority)throw new AppError(400,'Priorité requise.');await db.ticket.update({where:{id:t.id},data:{priority:p.priority}});}
   else throw new AppError(400,'Action de ticket inconnue.');
-  await audit(guild.id,actorId,`ticket.${p.action}`,p,t.id);await publish(guild.id,'tickets');return {ok:true};
+  await audit(guild.id,actorId,`ticket.${p.action}`,{...p,deleted},t.id);await publish(guild.id,'tickets');return {ok:true,deleted};
 }
 export async function automation(guild:Guild,trigger:string,userId:string,value=0,depth=0) {
   if(depth>=3)return;

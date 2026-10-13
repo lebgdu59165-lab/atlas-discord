@@ -42,9 +42,9 @@ Page : `/dashboard/:guildId/antiraid` (accès contrôlé).
 
 ### Tickets — partiel
 
-Panneaux multiples, salons privés, limite par membre, claim, participants, priorité, close/reopen, HTML et première réponse staff.
+Panneaux multiples, salons privés, limite par membre, claim, participants, priorité, fermeture/réouverture, HTML et première réponse staff. Option de suppression du salon à la fermeture : la transcription est sauvegardée avant la suppression et reste téléchargeable dans le tableau de bord. Un salon supprimé ne peut pas être rouvert. En cas de refus Discord, la fermeture peut être relancée pour réessayer la suppression.
 
-Reste à réaliser / limites : Questions préalables, transferts et fermeture automatique non implémentés.
+Reste à réaliser / limites : Questions préalables, transferts et fermeture pour inactivité non implémentés. Le contenu des messages reste soumis au réglage de confidentialité « conserver le contenu ».
 
 Page : `/dashboard/:guildId/tickets` (accès contrôlé).
 
