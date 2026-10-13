@@ -1,7 +1,7 @@
 import {describe,it,expect} from 'vitest';
 import {mkdtemp,mkdir,writeFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
-import {join} from 'node:path';
+import {join,resolve,basename,sep} from 'node:path';
 import {prismaClientReady} from '../scripts/prisma-ready.mjs';
 describe('Generated Prisma client reuse',()=>{
   it('requires a matching schema and a native engine for the current platform',async()=>{
@@ -18,6 +18,10 @@ describe('Generated Prisma client reuse',()=>{
       expect(await prismaClientReady(root,'win32')).toBe(false);
       await writeFile(join(root,'prisma/schema.prisma'),'model Example { id Int @id }');
       expect(await prismaClientReady(root,'linux')).toBe(false);
-    }finally{await rm(root,{recursive:true,force:true});}
+    }finally{
+      const target=resolve(root),temporary=resolve(tmpdir())+sep;
+      if(!target.startsWith(temporary)||!basename(target).startsWith('atlas-bootstrap-'))throw new Error('Unexpected bootstrap test directory.');
+      await rm(target,{recursive:true,force:true});
+    }
   });
 });
