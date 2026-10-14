@@ -6,7 +6,7 @@ vi.mock('../src/services/store',()=>({config:mocks.config,json:(v:unknown)=>v}))
 vi.mock('../src/lib/db',()=>({db:{entity:{upsert:mocks.store}}}));
 vi.mock('../src/lib/redis',()=>({publish:vi.fn()}));
 vi.mock('../src/bot/youtube-stream',()=>({youtubeAudioStream:mocks.download}));
-vi.mock('youtubei.js',()=>({Platform:{shim:{}},Innertube:{create:async()=>({search:async(q:string)=>({videos:[{id:q==='second'?'bbbbbbbbbbb':'aaaaaaaaaaa'}]}),getBasicInfo:async(id:string)=>({playability_status:{status:'OK'},basic_info:{title:id}}),download:mocks.download})}}));
+vi.mock('youtubei.js',()=>({Platform:{shim:{}},Innertube:{create:async()=>({search:async(q:string)=>({videos:[{id:q==='second'?'bbbbbbbbbbb':'aaaaaaaaaaa',title:q==='second'?'bbbbbbbbbbb':'aaaaaaaaaaa'}]}),getBasicInfo:async()=>{throw new Error('Legacy player API must not gate playback');},download:mocks.download})}}));
 vi.mock('node:child_process',async()=>{const {PassThrough}=await import('node:stream'),{EventEmitter}=await import('node:events');return {spawn:()=>{const p:any=new EventEmitter();p.stdin=new PassThrough();p.stdout=new PassThrough();p.kill=()=>{p.stdin.destroy();p.stdout.destroy();return true;};return p;}};});
 vi.mock('@discordjs/voice',async()=>{const {EventEmitter}=await import('node:events');return {
  VoiceConnectionStatus:{Ready:'ready',Disconnected:'disconnected',Connecting:'connecting',Signalling:'signalling'},AudioPlayerStatus:{Idle:'idle',Playing:'playing'},NoSubscriberBehavior:{Pause:'pause'},StreamType:{Raw:'raw'},
@@ -22,6 +22,12 @@ mocks.download.mockImplementation(async()=>new ReadableStream({start(c){c.enqueu
 afterEach(async()=>{voiceId=channel.id;try{await musicAction(guild,U,'stop');}catch{}vi.unstubAllGlobals();mocks.config.mockResolvedValue({value:{enabled:true,defaultVolume:50,maxQueue:50,idleSeconds:120}});});
 const latest=()=>mocks.store.mock.calls.at(-1)![0].update.data;
 describe('Music queue and voice controls',()=>{
+ it('uses public title metadata for links and allows playback when title lookup is unavailable',async()=>{
+  const request=vi.fn().mockResolvedValueOnce(new Response(JSON.stringify({title:'Une musique longue'}))).mockResolvedValueOnce(new Response('',{status:503}));vi.stubGlobal('fetch',request);
+  expect(await findTrack('https://www.youtube.com/watch?v=aqz-KE-bpKQ',U)).toMatchObject({id:'aqz-KE-bpKQ',title:'Une musique longue'});
+  expect(await findTrack('https://youtu.be/aqz-KE-bpKQ',U)).toMatchObject({id:'aqz-KE-bpKQ',title:'Musique YouTube'});
+  expect(request).toHaveBeenCalledWith(expect.stringContaining('youtube.com/oembed?'),expect.objectContaining({redirect:'error'}));
+ });
  it('accepts audio attachments without requiring YouTube and rejects unsafe attachment URLs',async()=>{
   const link='https://cdn.discordapp.com/attachments/933333333333333333/944444444444444444/musique.mp3?ex=abc';
   expect(await findTrack(link,U)).toMatchObject({title:'musique.mp3',url:link});

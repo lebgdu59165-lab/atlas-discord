@@ -20,7 +20,7 @@ export async function youtube(){
    try{const result=context.evalCode(`(()=>{${data.output}\n})()`);if(result.error){result.error.dispose();throw new Error('YouTube evaluator failed');}const value=context.dump(result.value);result.value.dispose();return value;}
    finally{context.dispose();rt.dispose();}
   };
-  return Innertube.create({lang:'fr',location:'FR',fetch:async(input:any,init:any)=>{const timeout=new AbortController(),timer=setTimeout(()=>timeout.abort(),20000);try{return await fetch(input,{...init,signal:init?.signal?AbortSignal.any([timeout.signal,init.signal]):timeout.signal});}finally{clearTimeout(timer);}}});
+  return Innertube.create({lang:'fr',location:'FR',retrieve_player:false,fetch:async(input:any,init:any)=>{const timeout=new AbortController(),timer=setTimeout(()=>timeout.abort(),20000);try{return await fetch(input,{...init,signal:init?.signal?AbortSignal.any([timeout.signal,init.signal]):timeout.signal});}finally{clearTimeout(timer);}}});
  })().catch(e=>{youtubePromise=undefined;throw e;});
  return youtubePromise;
 }
@@ -42,10 +42,11 @@ async function trackStream(track:Track){
  return youtubeAudioStream(track.id);
 }
 export async function findTrack(query:string,userId:string):Promise<Track>{
- try{const audio=discordAudioUrl(query);if(audio)return {id:audio.pathname.split('/').slice(-2).join('/'),title:decodeURIComponent(audio.pathname.split('/').at(-1)!).slice(0,200),requestedBy:userId,url:audio.href};const yt=await youtube();let id=youtubeId(query);
-  if(!id){const results=await yt.search(query,{type:'video'});id=results.videos.find((v:any)=>v.id)?.id??null;}
-  if(!id)throw new AppError(404,'Aucun morceau trouvé.');const info=await yt.getBasicInfo(id);if(info.playability_status?.status!=='OK')throw new AppError(502,'YouTube refuse la lecture de cette vidéo. Essayez un autre lien public.');
-  return {id,title:String(info.basic_info.title??'Vidéo YouTube').slice(0,200),requestedBy:userId};
+ try{const audio=discordAudioUrl(query);if(audio)return {id:audio.pathname.split('/').slice(-2).join('/'),title:decodeURIComponent(audio.pathname.split('/').at(-1)!).slice(0,200),requestedBy:userId,url:audio.href};let id=youtubeId(query),title='Musique YouTube';
+  if(!id){const results=await (await youtube()).search(query,{type:'video'}),video=results.videos.find((v:any)=>/^[\w-]{11}$/.test(v.id??''));id=video?.id??null;if(video?.title)title=String(video.title.text??video.title);}
+  else{try{const response=await fetch(`https://www.youtube.com/oembed?${new URLSearchParams({url:`https://www.youtube.com/watch?v=${id}`,format:'json'})}`,{redirect:'error',signal:AbortSignal.timeout(7000)});if(response.ok){const meta=await response.json();if(typeof meta.title==='string'&&meta.title.trim())title=meta.title;}}catch{/* Metadata is optional; the actual stream decides whether playback is available. */}}
+  if(!id)throw new AppError(404,'Aucun morceau trouvé.');
+  return {id,title:title.slice(0,200),requestedBy:userId};
  }catch(e){if(e instanceof AppError)throw e;throw new AppError(502,'YouTube est temporairement indisponible ou refuse cet hébergeur. Aucun morceau n’a été annoncé comme joué.');}
 }
 async function persist(s:Session){await db.entity.upsert({where:{id:`music:${s.guild.id}`},create:{id:`music:${s.guild.id}`,guildId:s.guild.id,module:'music-state',title:'Lecteur audio',ownerId:s.guild.client.user!.id,status:'active',data:json(state(s))},update:{data:json(state(s)),status:'active'}});await publish(s.guild.id,'music');}
