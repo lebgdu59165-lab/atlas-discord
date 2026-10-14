@@ -14,7 +14,8 @@ async function runNpm(args) {
   });
 }
 
-const lockHash = createHash('sha256').update(await readFile('package-lock.json')).digest('hex');
+// Installation approvals are part of the manifest and must invalidate the cache too.
+const lockHash = createHash('sha256').update(await readFile('package-lock.json')).update(await readFile('package.json')).digest('hex');
 const stampPath = 'node_modules/.atlas-lock.sha256';
 const installedHash = await readFile(stampPath, 'utf8').catch(() => '');
 if (installedHash !== lockHash) {
