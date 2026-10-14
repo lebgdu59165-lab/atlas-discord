@@ -8,7 +8,8 @@ export const json = (value: unknown) => JSON.parse(JSON.stringify(value)) as Pri
 export async function config(guildId:string, module:string) {
   const m=byId(module); if (!m) throw new AppError(404,'Module inconnu.');
   const stored=await db.config.findUnique({where:{guildId_module:{guildId,module}}});
-  return { value:{...defaults(m.fields),...(stored?.value as object ?? {})},revision:stored?.revision ?? 0 };
+  const keys=new Set(m.fields.map(f=>f.key));
+  return { value:{...defaults(m.fields),...Object.fromEntries(Object.entries(stored?.value as object ?? {}).filter(([key])=>keys.has(key)))},revision:stored?.revision ?? 0 };
 }
 export async function audit(guildId:string,actorId:string,action:string,detail:unknown={},targetId?:string) {
   return db.audit.create({data:{guildId,actorId,action,targetId,detail:json(detail)}});

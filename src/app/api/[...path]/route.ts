@@ -90,6 +90,10 @@ async function handler(req:Request,{params}:{params:Promise<{path:string[]}>}) {
       if(method==='GET') return response(await config(guildId,c));
       if(method==='PUT') return response(await saveConfig(guildId,actor,c,await body(req)));
     }
+    if(b==='music'){
+      if(method==='GET'){const state=await db.entity.findFirst({where:{guildId,module:'music-state'}}),heart=await db.globalSetting.findUnique({where:{key:'botHeartbeat'}});const online=Boolean(heart&&Date.now()-Number((heart.value as any).at)<60000);return response({...(state?.data as object??{}),botOnline:online,...(!online?{connected:false}:{} )});}
+      if(method==='POST'){const p=z.object({action:z.enum(['pause','resume','skip','stop','volume','loop','shuffle','remove']),value:z.number().int().min(0).max(100).optional()}).strict().parse(await body(req));if(['volume','remove'].includes(p.action)&&p.value===undefined)throw new AppError(400,'Valeur requise.');return response(await enqueue(guildId,actor,'music',p),202);}
+    }
     if(b==='records' && c && byId(c)) {
       if(d) {
         const record=await getRecord(guildId,d,c);
@@ -157,7 +161,7 @@ async function handler(req:Request,{params}:{params:Promise<{path:string[]}>}) {
       const {safeFetch}=await import('../../../lib/safe-fetch');return response(await safeFetch(String(c.value.statusUrl)));
     }
     if(b==='logs') return response(await db.audit.findMany({where:{guildId,...(url.searchParams.get('q')?{action:{contains:url.searchParams.get('q')!,mode:'insensitive'}}:{})},orderBy:{createdAt:'desc'},take:200}));
-    if(b==='jobs') return response(await db.job.findMany({where:{guildId},orderBy:{createdAt:'desc'},take:100}));
+    if(b==='jobs') {const jobs=await db.job.findMany({where:{guildId},orderBy:{createdAt:'desc'},take:100});return response(jobs.map(job=>job.kind==='reminder'&&job.actorId!==actor?{...job,payload:{userId:job.actorId,private:true}}:job));}
     if(b==='twitch-status'&&method==='GET') {
       await authorize(guildId,actor,'content');
       const [runtime,lastDelivery,lastJob]=await Promise.all([

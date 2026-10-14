@@ -8,6 +8,10 @@ import { variables, levelOf } from '../shared/catalog';
 import { execute, openTicket, ticketAction, setRole, sanction, sendText, automation } from './actions';
 import { pollTwitch } from './twitch';
 import { dispatchCommand } from './commands';
+import {prefixCommand} from './prefix';
+import {participate} from '../services/community';
+import {handledCommandNames} from './commands';
+import {builtinCommands} from '../shared/commands';
 const intents=[GatewayIntentBits.Guilds,GatewayIntentBits.GuildMessages,GatewayIntentBits.GuildVoiceStates];
 if(process.env.DISCORD_MEMBERS_INTENT==='true')intents.push(GatewayIntentBits.GuildMembers);
 if(process.env.DISCORD_MESSAGE_CONTENT_INTENT==='true')intents.push(GatewayIntentBits.MessageContent);
@@ -19,6 +23,7 @@ async function track(guild:Guild) {
 const safe=(fn:(...args:any[])=>Promise<any>)=>(...args:any[])=>void fn(...args).catch(e=>console.error('Bot event failed:',e instanceof AppError?e.message:e?.name ?? 'UnknownError',/^P\d{4}$/.test(e?.errorCode??e?.code??'')?(e.errorCode??e.code):''));
 client.once(Events.ClientReady,safe(async()=>{
   for(const guild of client.guilds.cache.values())await track(guild);
+  await db.entity.updateMany({where:{guildId:{in:[...client.guilds.cache.keys()]},module:'music-state'},data:{status:'offline',data:json({connected:false,current:null,queue:[],checkedAt:new Date().toISOString()})}});
   await db.job.updateMany({where:{status:'running',lockedAt:{lt:new Date(Date.now()-300000)}},data:{status:'failed',error:'Exécution interrompue : vérifier Discord avant de relancer manuellement.'}});
   setInterval(safe(heartbeat),15000).unref();setInterval(safe(work),1000).unref();setInterval(safe(expireBans),30000).unref();
   setInterval(safe(async()=>{for(const guild of client.guilds.cache.values())await track(guild);}),60000).unref();
@@ -27,7 +32,7 @@ client.once(Events.ClientReady,safe(async()=>{
   await heartbeat();console.log(`Atlas connected: ${client.guilds.cache.size} guilds`);
   safe(()=>pollTwitch(client))();
 }));
-async function heartbeat(){await db.globalSetting.upsert({where:{key:'botHeartbeat'},create:{key:'botHeartbeat',value:json({at:Date.now(),latency:client.ws.ping,intents:process.env.DISCORD_MESSAGE_CONTENT_INTENT==='true'})},update:{value:json({at:Date.now(),latency:client.ws.ping,intents:process.env.DISCORD_MESSAGE_CONTENT_INTENT==='true'})}});}
+async function heartbeat(){await db.globalSetting.upsert({where:{key:'botHeartbeat'},create:{key:'botHeartbeat',value:json({at:Date.now(),latency:client.ws.ping,intents:process.env.DISCORD_MESSAGE_CONTENT_INTENT==='true',commands:handledCommandNames})},update:{value:json({at:Date.now(),latency:client.ws.ping,intents:process.env.DISCORD_MESSAGE_CONTENT_INTENT==='true',commands:handledCommandNames})}});}
 let busy=false;
 async function work(){
   if(busy)return;busy=true;
@@ -96,6 +101,7 @@ export async function checkMessage(message:Message){
     const reason=n>Number(d.maxMessages)?'Spam / flood':d.links&&/https?:\/\//i.test(content)?'Lien interdit':d.invites&&/(discord\.gg\/|discord(?:app)?\.com\/invite\/)/i.test(content)?'Invitation interdite':message.mentions.users.size+message.mentions.roles.size>Number(d.maxMentions)||message.mentions.everyone?'Mentions massives':d.caps&&letters.length>=10&&caps.length/letters.length*100>Number(d.capsPercent)?'Majuscules excessives':d.emoji&&(content.match(/\p{Extended_Pictographic}|<a?:\w+:\d+>/gu)??[]).length>Number(d.maxEmoji)?'Emojis excessifs':words.some(w=>content.toLowerCase().includes(w))?'Contenu du dictionnaire interdit':null;
     if(reason){if(d.action==='delete'){if(!message.member.permissions.has(PermissionFlagsBits.Administrator))await message.delete();}else if(['warn','timeout','kick','ban'].includes(String(d.action)))await sanction(guild,client.user!.id,{action:d.action,userId:message.author.id,reason,seconds:d.timeoutSeconds},true);if(d.logChannelId)await sendText(guild,String(d.logChannelId),`${reason} · <@${message.author.id}> · salon <#${message.channelId}>`);await logEvent(guild,'automod.trigger',{reason,userId:message.author.id});return;}
   }
+  if(await prefixCommand(message))return;
   const levels=await config(guild.id,'levels');
   if(levels.value.enabled && !(levels.value.excludedChannels as string[]).includes(message.channelId) && !(levels.value.excludedUsers as string[]).includes(message.author.id) && !message.member.roles.cache.some(r=>(levels.value.excludedRoles as string[]).includes(r.id))){
     const result=await db.$transaction(async tx=>{
@@ -125,10 +131,11 @@ client.on(Events.InteractionCreate,safe(async interaction=>{
       if(interaction.customId==='verify'){const c=await config(interaction.guildId!,'autoroles');if(!c.value.enabled||!c.value.verifiedRoleId)throw new AppError(409,'Vérification désactivée.');await setRole(interaction.guild,interaction.user.id,String(c.value.verifiedRoleId),true);await interaction.editReply('Votre règlement a été accepté.');}
       else if(interaction.customId.startsWith('ticket:open:')){const id=interaction.customId.slice(12),channel=await openTicket(interaction.guild,interaction.user.id,id);await interaction.editReply(`Votre ticket : <#${channel}>`);}
       else if(interaction.customId.startsWith('ticket:close:')){const result=await ticketAction(interaction.guild,interaction.user.id,{action:'close',id:interaction.customId.slice(13),reason:'Fermé depuis Discord'},true,()=>interaction.editReply('Transcription sauvegardée. Suppression du salon en cours…'));if(!result.deleted)await interaction.editReply('Ticket fermé.');}
+      else if(interaction.customId.startsWith('community:')){const [,kind,id,choice]=interaction.customId.split(':');if(!id||!['poll','giveaway'].includes(kind))throw new AppError(400,'Bouton invalide.');const r=await db.entity.findFirst({where:{id,guildId:interaction.guildId!,module:kind==='poll'?'polls':'giveaways'}});if(!r)throw new AppError(404,'Élément introuvable sur ce serveur.');await participate(interaction.guildId!,interaction.user.id,id,kind==='poll'?{action:'vote',choice:Number(choice)}:{action:'join'});await interaction.editReply(kind==='poll'?'Votre vote est enregistré.':'Votre participation est enregistrée.');}
       else await interaction.editReply('Bouton inconnu ou expiré.');
     }
     if(interaction.isChatInputCommand()) {
-      await interaction.deferReply();
+      if(interaction.commandName==='remind'||['Modération','Configuration','Économie','Niveaux','Rôles'].includes(builtinCommands.find(c=>c.name===interaction.commandName)?.category??''))await interaction.deferReply({flags:64});else await interaction.deferReply();
       await dispatchCommand(interaction);
     }
   }catch(error){const message=error instanceof AppError?error.message:'Discord a refusé l’action. Vérifiez les permissions du bot.';if(interaction.isRepliable()){if(interaction.deferred||interaction.replied)await interaction.editReply(message);else await interaction.reply({content:message,flags:64});}}

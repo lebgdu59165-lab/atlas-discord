@@ -7,6 +7,8 @@ import { variables, permissionFor, type Permission } from '../shared/catalog';
 import { publish } from '../lib/redis';
 import { deliverTwitchLive } from './twitch';
 import { commandsForSync } from '../shared/commands';
+import {deliverReminder} from './command-community';
+import {musicAction} from './music';
 export const escapeHtml=(s:string)=>s.replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]!));
 async function me(guild:Guild,permission:bigint) {
   const bot=await guild.members.fetchMe();if(!bot.permissions.has(permission)) throw new AppError(403,'Le bot ne dispose pas de la permission Discord requise.');return bot;
@@ -152,6 +154,7 @@ export async function automation(guild:Guild,trigger:string,userId:string,value=
 }
 export async function execute(client:Client,job:any) {
   if(job.kind==='twitchLive')return deliverTwitchLive(client,job);
+  if(job.kind==='reminder')return deliverReminder(client,job);
   const guild=await client.guilds.fetch(job.guildId),p=job.payload;
   const perms:Record<string,Permission>={moderation:'moderation',roles:['addRole','removeRole'].includes(p.action)?'members':'roles',ticket:'tickets',publish:'content',syncCommands:'content',verifyPanel:'config',recruitmentAccept:'content'};
   if(job.kind!=='shopRole')await authorize(guild.id,job.actorId,perms[job.kind]??'content');
@@ -168,7 +171,8 @@ export async function execute(client:Client,job:any) {
   }
   if(job.kind==='ticket'){const result=await ticketAction(guild,job.actorId,p);if(p.action==='close'){const t=await db.ticket.findUniqueOrThrow({where:{id:p.id}});await automation(guild,'ticketClosed',t.userId);}return result;}
   if(job.kind==='publish'){const r=await getRecord(guild.id,p.id);await authorize(guild.id,job.actorId,permissionFor(r.module));return publishRecord(guild,p.id);}
-  if(job.kind==='syncCommands') {const records=await db.entity.findMany({where:{guildId:guild.id,module:'commands',status:'active'}});let commands;try{commands=commandsForSync(records);}catch(e){throw new AppError(409,(e as Error).message);}if(commands.length>100)throw new AppError(400,'Discord limite le serveur à 100 commandes slash.');await guild.commands.set(commands);return {count:commands.length};}
+  if(job.kind==='music')return {message:await musicAction(guild,job.actorId,p.action,p.value)};
+  if(job.kind==='syncCommands') {const records=await db.entity.findMany({where:{guildId:guild.id,module:'commands',status:'active'}}),settings=await config(guild.id,'commands');let commands;try{commands=commandsForSync(records,String(settings.value.disabledNative??'').split(/[\s,]+/).map(s=>s.replace(/^\//,'')));}catch(e){throw new AppError(409,(e as Error).message);}if(commands.length>100)throw new AppError(400,'Discord limite le serveur à 100 commandes slash.');await guild.commands.set(commands);return {count:commands.length};}
   if(job.kind==='verifyPanel') {const c=await config(guild.id,'autoroles');if(!c.value.verifiedRoleId)throw new AppError(400,'Configurez le rôle de vérification.');const channel=await guild.channels.fetch(String(c.value.channelId));if(!channel?.isTextBased()||!('send'in channel))throw new AppError(400,'Salon invalide.');const m=await channel.send({content:String(c.value.message),components:[new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId('verify').setLabel('J’accepte le règlement').setStyle(ButtonStyle.Success))],allowedMentions:{parse:[]}});return {messageId:m.id};}
   if(job.kind==='recruitmentAccept') {
     const r=await getRecord(guild.id,p.id,'applications');if(r.status!=='pending')throw new AppError(409,'Candidature déjà traitée.');

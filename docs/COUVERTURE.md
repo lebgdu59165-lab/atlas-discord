@@ -116,17 +116,17 @@ Page : `/dashboard/:guildId/events` (accès contrôlé).
 
 ### Giveaways — partiel
 
-Participations web, expiration automatique, tirage cryptographique sans doublon et publication programmée des résultats.
+Participations Discord par bouton et web, expiration automatique, tirage cryptographique sans doublon et publication programmée des résultats.
 
-Reste à réaliser / limites : Conditions par rôle et participation Discord non implémentées. Participations web disponibles.
+Reste à réaliser / limites : Participations Discord et web disponibles. Conditions avancées par rôle non implémentées.
 
 Page : `/dashboard/:guildId/giveaways` (accès contrôlé).
 
 ### Sondages — partiel
 
-Choix web, une voix par membre modifiable, fermeture manuelle/programmée et comptage des votes.
+Sondages Discord Oui/Non et choix web, une voix par membre modifiable, fermeture manuelle/programmée et comptage des votes.
 
-Reste à réaliser / limites : Les votes sont identifiés côté serveur ; publication/vote Discord et anonymat public non implémentés.
+Reste à réaliser / limites : Publication et vote Discord disponibles. Les votes sont identifiés côté serveur ; anonymat public non implémenté.
 
 Page : `/dashboard/:guildId/polls` (accès contrôlé).
 
@@ -146,9 +146,9 @@ Page : `/dashboard/:guildId/embeds` (accès contrôlé).
 
 ### Commandes — partiel
 
-Commandes intégrées `/help`, `/ping`, `/uptime`, `/stats`, `/userinfo`, `/serverinfo` et `/avatar`, disponibles sans créer de commande personnalisée. Création de slash texte, synchronisation Discord (conserve les commandes intégrées), permissions de rôle, cooldown et usage enregistré. Les commandes héritées sans gestionnaire sont signalées comme non prises en charge, et non comme désactivées.
+Les 70 commandes existantes disposent d’un gestionnaire : informations, modération, niveaux, économie virtuelle, rôles, configuration, musique, sondages, giveaways, rappels et outils. Elles fonctionnent en slash et avec le préfixe texte configurable. La liste complète et les paramètres sont documentés dans [COMMANDES.md](COMMANDES.md). Les désactivations explicites se règlent dans le tableau de bord.
 
-Reste à réaliser / limites : Réponse texte et cooldown disponibles. Paramètres typés et suites d’actions non implémentés.
+Reste à réaliser / limites : les commandes personnalisées restent des réponses texte avec rôles et cooldown ; les paramètres typés et suites d’actions personnalisées ne sont pas implémentés. Les paramètres des 70 commandes intégrées sont typés et validés.
 
 Page : `/dashboard/:guildId/commands` (accès contrôlé).
 
@@ -184,13 +184,13 @@ Reste à réaliser / limites : Endpoint public de statut et suivis RP web dispon
 
 Page : `/dashboard/:guildId/fivem` (accès contrôlé).
 
-### Musique — indisponible
+### Musique — partiel
 
-Aucun moteur audio. Page explicitement indisponible.
+Connexion vocale Discord avec DAVE, recherche/lecture YouTube, file, pause/reprise, morceau suivant, arrêt, volume, répétition, retrait et mélange. Le tableau de bord reflète le lecteur et permet de le contrôler depuis le même salon vocal. L’audio passe par FFmpeg et Opus ; les signatures YouTube sont interprétées dans QuickJS isolé sans accès aux secrets du bot.
 
-Reste à réaliser / limites : Le moteur audio n’est pas implémenté. Aucun bouton ne prétend lancer de musique.
+Limites : disponibilité et restrictions YouTube, permissions Connecter/Parler et charge de l’hébergement. La file est en mémoire et se vide au redémarrage. Le test de décodage audio ne remplace pas une écoute dans un salon vocal réel.
 
-Page : `/dashboard/:guildId/music` (notice d’indisponibilité).
+Page : `/dashboard/:guildId/music`.
 
 ### Assistant IA — partiel
 
@@ -252,7 +252,7 @@ Les tests et la procédure de recette de **chaque module** figurent dans [TESTS.
 - FiveM : le suivi RP sauvegarde des documents typés, sans automatiser les entreprises, factions, grades ou promotions dans le jeu. Pas de ressource Lua, API authentifiée dédiée ou collecte des logs RP du serveur.
 - Staff : pas d’évaluations, sanctions internes, présence vocale ou rapports statistiques complets.
 - IA : pas de résumé automatique de ticket, suivi du coût monétaire ou index documentaire. Le modèle et le fournisseur doivent être configurés.
-- Musique, RSS, YouTube et webhooks externes : non implémentés. Les annonces Twitch sont disponibles ; voir TWITCH.md.
+- RSS, notifications de publications YouTube et webhooks externes non implémentés. La musique YouTube et les annonces Twitch sont disponibles avec leurs limites respectives.
 - Global : pas de gestion d’administrateurs système secondaires, déploiement web des mises à jour, quotas globaux ou gestion multilingue.
 - Interface : navigation et recherche de modules, thème et responsive implémentés ; la sidebar devient un tiroir mobile, sans mode réduit à icônes sur desktop.
 - Journal : connexions OAuth2 non associées à chaque serveur, attribution des invitations et logs exhaustifs de pseudos non collectés.

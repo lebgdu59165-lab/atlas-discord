@@ -20,20 +20,26 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
+    "@discordjs/voice": "0.19.2",
     "@prisma/client": "6.19.3",
     "@radix-ui/react-dialog": "1.1.15",
     "discord.js": "14.27.0",
     "dotenv": "17.2.3",
+    "ffmpeg-static": "5.3.0",
     "ioredis": "5.8.2",
     "lucide-react": "0.468.0",
     "next": "16.4.0",
+    "opusscript": "0.0.8",
     "prisma": "6.19.3",
+    "quickjs-emscripten": "0.32.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "recharts": "3.5.1",
+    "sharp": "0.35.5",
     "socket.io": "4.8.1",
     "socket.io-client": "4.8.1",
     "tsx": "4.20.6",
+    "youtubei.js": "18.1.0",
     "zod": "3.25.76"
   },
   "overrides": {

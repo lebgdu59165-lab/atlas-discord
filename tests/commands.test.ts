@@ -1,20 +1,22 @@
 import {beforeEach,describe,it,expect,vi} from 'vitest';
-const mocks=vi.hoisted(()=>({find:vi.fn(),metric:vi.fn(),audit:vi.fn(),set:vi.fn()}));
+const mocks=vi.hoisted(()=>({find:vi.fn(),metric:vi.fn(),audit:vi.fn(),set:vi.fn(),config:vi.fn()}));
 vi.mock('../src/lib/db',()=>({db:{entity:{findMany:mocks.find}}}));
-vi.mock('../src/services/store',()=>({metric:mocks.metric,audit:mocks.audit}));
-vi.mock('../src/lib/redis',()=>({redis:()=>({set:mocks.set})}));
-import {dispatchCommand} from '../src/bot/commands';
+vi.mock('../src/services/store',()=>({metric:mocks.metric,audit:mocks.audit,config:mocks.config,json:(v:unknown)=>v,saveConfig:vi.fn(),createRecord:vi.fn(),getRecord:vi.fn()}));
+vi.mock('../src/lib/redis',()=>({redis:()=>({set:mocks.set}),rateLimit:vi.fn(),publish:vi.fn()}));
+import {dispatchCommand,handledCommandNames} from '../src/bot/commands';
 import {commandsForSync,builtinCommands} from '../src/shared/commands';
 let interaction:any;
 const record=(enabled=true)=>({id:'custom',guildId:'guild',status:'active',title:'Custom',data:{name:'hello',description:'Say hello',response:'Bonjour {user}',enabled,allowedRoles:[],cooldown:0}});
 beforeEach(()=>{
-  vi.resetAllMocks();mocks.find.mockResolvedValue([]);mocks.set.mockResolvedValue('OK');
+  vi.resetAllMocks();mocks.find.mockResolvedValue([]);mocks.set.mockResolvedValue('OK');mocks.config.mockResolvedValue({value:{disabledNative:''}});
   interaction={commandName:'ping',guild:{id:'guild',name:'Test',memberCount:42,channels:{cache:{size:3}},roles:{cache:{size:2}},createdTimestamp:0,members:{fetch:vi.fn().mockResolvedValue({roles:{cache:{some:()=>false}}})}},user:{id:'user'},client:{ws:{ping:37}},options:{getString:()=>null,getUser:()=>null},editReply:vi.fn()};
 });
 describe('Native and custom slash commands',()=>{
   it('runs ping even when no custom command has been configured',async()=>{await dispatchCommand(interaction);expect(interaction.editReply).toHaveBeenCalledWith({content:expect.stringContaining('37 ms'),allowedMentions:{parse:[]}});expect(mocks.audit).toHaveBeenCalledWith('guild','user','command.used',{name:'ping'});});
-  it('lists available commands and the dashboard in help',async()=>{interaction.commandName='help';await dispatchCommand(interaction);expect(interaction.editReply.mock.calls[0][0].content).toContain('/ping');expect(interaction.editReply.mock.calls[0][0].content).toContain('/dashboard/guild');});
-  it('does not falsely call an absent legacy command disabled',async()=>{interaction.commandName='play';await expect(dispatchCommand(interaction)).rejects.toMatchObject({status:404,message:expect.stringContaining('/play provient de l’ancienne version')});expect(interaction.editReply).not.toHaveBeenCalled();});
+  it('lists all 70 commands and the dashboard in help',async()=>{interaction.commandName='help';await dispatchCommand(interaction);const embed=interaction.editReply.mock.calls[0][0].embeds[0].toJSON();expect(embed.description).toContain('/dashboard/guild');for(const c of builtinCommands)expect(embed.fields.map((f:any)=>f.value).join(' ')).toContain('/'+c.name);});
+  it('distinguishes an unknown command from a disabled one',async()=>{interaction.commandName='unknown-command';await expect(dispatchCommand(interaction)).rejects.toMatchObject({status:404,message:expect.stringContaining('introuvable')});expect(interaction.editReply).not.toHaveBeenCalled();});
+  it('has exactly one handler for every original command, without omissions',()=>{const expected='help ping uptime stats userinfo serverinfo avatar poll ban unban kick mute unmute warn warns clearwarns clear slowmode lock unlock nick rank leaderboard givexp resetxp join play pause resume skip stop queue volume loop nowplaying remove shuffle 8ball coinflip roll joke meme ship giveaway balance daily work pay deposit withdraw gamble richesse shop prefix setlog setwelcome autorole setxp config role createrole deleterole announce embed remind meteo calc color encode decode'.split(' ');expect([...handledCommandNames].sort()).toEqual(expected.sort());expect(builtinCommands.map(c=>c.name).sort()).toEqual(expected.sort());expect(new Set(handledCommandNames).size).toBe(70);});
+  it('supports intentionally disabling native commands from the dashboard',async()=>{mocks.config.mockResolvedValue({value:{disabledNative:'ping'}});await expect(dispatchCommand(interaction)).rejects.toMatchObject({status:409});expect(interaction.editReply).not.toHaveBeenCalled();});
   it('preserves an explicit disabled custom command including a native-name override',async()=>{interaction.commandName='ping';const r=record(false);r.data.name='ping';mocks.find.mockResolvedValue([r]);await expect(dispatchCommand(interaction)).rejects.toMatchObject({status:409,message:expect.stringContaining('désactivée dans le tableau de bord')});expect(interaction.editReply).not.toHaveBeenCalled();});
   it('enforces custom role restrictions and cooldown before replying',async()=>{
     interaction.commandName='hello';const r=record();r.data.allowedRoles=['staff'] as any;mocks.find.mockResolvedValue([r]);await expect(dispatchCommand(interaction)).rejects.toMatchObject({status:403});expect(interaction.editReply).not.toHaveBeenCalled();

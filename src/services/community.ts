@@ -7,14 +7,14 @@ import { publish, redis } from '../lib/redis';
 import { snowflake } from '../shared/catalog';
 const MAX=1000000000;
 export async function economy(guildId:string,actorId:string,input:unknown,staff=false) {
-  const p=z.object({action:z.enum(['daily','weekly','work','deposit','withdraw','transfer','adjust','buy']),amount:z.number().int().min(-MAX).max(MAX).optional(),userId:snowflake.optional(),itemId:z.string().max(100).optional(),reason:z.string().min(1).max(1000).optional()}).strict().parse(input);
+  const p=z.object({action:z.enum(['daily','weekly','work','deposit','withdraw','transfer','adjust','buy','gamble']),amount:z.number().int().min(-MAX).max(MAX).optional(),userId:snowflake.optional(),itemId:z.string().max(100).optional(),reason:z.string().min(1).max(1000).optional()}).strict().parse(input);
   if (p.action==='adjust' && !staff) throw new AppError(403,'Ajustement réservé au staff.');
   const c=await config(guildId,'economy'); if (!c.value.enabled) throw new AppError(409,'L’économie est désactivée.');
   const userId=p.action==='adjust' ? (p.userId ?? actorId) : actorId;
   const result=await db.$transaction(async tx=>{
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${guildId + ':economy'}, 0))`;
     const a=await tx.account.upsert({where:{guildId_userId:{guildId,userId}},create:{guildId,userId},update:{}});
-    let wallet=a.wallet,bank=a.bank,amount=p.amount ?? 0,extra:any={};
+    let wallet=a.wallet,bank=a.bank,amount=p.amount ?? 0,extra:any={},gambleWon:boolean|undefined;
     const now=new Date();
     if (['daily','weekly','work'].includes(p.action)) {
       const field=p.action==='daily'?'dailyAt':p.action==='weekly'?'weeklyAt':'workAt';
@@ -37,6 +37,7 @@ export async function economy(guildId:string,actorId:string,input:unknown,staff=
       if (amount<=0) throw new AppError(400,'Le montant doit être positif.');
       if (p.action==='deposit') {wallet-=amount;bank+=amount;amount=-amount;}
       if (p.action==='withdraw') {wallet+=amount;bank-=amount;}
+      if (p.action==='gamble') {if(wallet<amount)throw new AppError(409,'Solde insuffisant.');gambleWon=randomInt(2)===1;amount=gambleWon?amount:-amount;wallet+=amount;}
       if (p.action==='transfer') {
         if (!p.userId || p.userId===actorId) throw new AppError(400,'Choisissez un autre membre.');
         wallet-=amount;
@@ -50,7 +51,7 @@ export async function economy(guildId:string,actorId:string,input:unknown,staff=
     if (wallet<0 || bank<0 || wallet>MAX || bank>MAX) throw new AppError(409,'Solde insuffisant ou plafond atteint.');
     await tx.transaction.create({data:{guildId,userId,actorId,amount,kind:p.action,reason:p.reason ?? p.action}});
     await tx.audit.create({data:{guildId,actorId,action:`economy.${p.action}`,targetId:userId,detail:json({amount})}});
-    return tx.account.update({where:{guildId_userId:{guildId,userId}},data:{wallet,bank,...extra}});
+    const updated=await tx.account.update({where:{guildId_userId:{guildId,userId}},data:{wallet,bank,...extra}});return {...updated,...(gambleWon===undefined?{}:{gambleWon})};
   },{timeout:10000});
   await publish(guildId,'economy');return result;
 }

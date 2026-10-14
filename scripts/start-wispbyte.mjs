@@ -37,4 +37,11 @@ if(!await prismaClientReady()){
   if (generationCode !== 0) process.exit(generationCode);
 }else console.log('Client Prisma déjà généré pour ce schéma ; lancement direct du bot.');
 
+// Validate the audio dependencies once per package lock, without joining a voice channel.
+const audioStamp='node_modules/.atlas-audio.sha256';
+if(await readFile(audioStamp,'utf8').catch(()=>'')!==lockHash){
+ await new Promise(resolve=>{const child=spawn(process.execPath,['bot-build/music-probe.mjs'],{stdio:'inherit',windowsHide:true});child.once('error',resolve);child.once('exit',resolve);});
+ await writeFile(audioStamp,lockHash);
+}
+
 await import('./start-discloud.mjs');
