@@ -146,7 +146,7 @@ Page : `/dashboard/:guildId/embeds` (accès contrôlé).
 
 ### Commandes — partiel
 
-Création de slash texte, synchronisation Discord, permissions de rôle, cooldown et usage enregistré.
+Commandes intégrées `/help`, `/ping`, `/uptime`, `/stats`, `/userinfo`, `/serverinfo` et `/avatar`, disponibles sans créer de commande personnalisée. Création de slash texte, synchronisation Discord (conserve les commandes intégrées), permissions de rôle, cooldown et usage enregistré. Les commandes héritées sans gestionnaire sont signalées comme non prises en charge, et non comme désactivées.
 
 Reste à réaliser / limites : Réponse texte et cooldown disponibles. Paramètres typés et suites d’actions non implémentés.
 

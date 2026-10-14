@@ -6,6 +6,7 @@ import { config, json, audit, metric, getRecord } from '../services/store';
 import { variables, permissionFor, type Permission } from '../shared/catalog';
 import { publish } from '../lib/redis';
 import { deliverTwitchLive } from './twitch';
+import { commandsForSync } from '../shared/commands';
 export const escapeHtml=(s:string)=>s.replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]!));
 async function me(guild:Guild,permission:bigint) {
   const bot=await guild.members.fetchMe();if(!bot.permissions.has(permission)) throw new AppError(403,'Le bot ne dispose pas de la permission Discord requise.');return bot;
@@ -167,7 +168,7 @@ export async function execute(client:Client,job:any) {
   }
   if(job.kind==='ticket'){const result=await ticketAction(guild,job.actorId,p);if(p.action==='close'){const t=await db.ticket.findUniqueOrThrow({where:{id:p.id}});await automation(guild,'ticketClosed',t.userId);}return result;}
   if(job.kind==='publish'){const r=await getRecord(guild.id,p.id);await authorize(guild.id,job.actorId,permissionFor(r.module));return publishRecord(guild,p.id);}
-  if(job.kind==='syncCommands') {const records=await db.entity.findMany({where:{guildId:guild.id,module:'commands',status:'active'}});const commands=records.map(r=>({r,d:r.data as any})).filter(x=>x.d.enabled).map(x=>({name:x.d.name,description:x.d.description||x.r.title}));if(commands.length>100)throw new AppError(400,'Discord limite le serveur à 100 commandes slash.');await guild.commands.set(commands);return {count:commands.length};}
+  if(job.kind==='syncCommands') {const records=await db.entity.findMany({where:{guildId:guild.id,module:'commands',status:'active'}});let commands;try{commands=commandsForSync(records);}catch(e){throw new AppError(409,(e as Error).message);}if(commands.length>100)throw new AppError(400,'Discord limite le serveur à 100 commandes slash.');await guild.commands.set(commands);return {count:commands.length};}
   if(job.kind==='verifyPanel') {const c=await config(guild.id,'autoroles');if(!c.value.verifiedRoleId)throw new AppError(400,'Configurez le rôle de vérification.');const channel=await guild.channels.fetch(String(c.value.channelId));if(!channel?.isTextBased()||!('send'in channel))throw new AppError(400,'Salon invalide.');const m=await channel.send({content:String(c.value.message),components:[new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId('verify').setLabel('J’accepte le règlement').setStyle(ButtonStyle.Success))],allowedMentions:{parse:[]}});return {messageId:m.id};}
   if(job.kind==='recruitmentAccept') {
     const r=await getRecord(guild.id,p.id,'applications');if(r.status!=='pending')throw new AppError(409,'Candidature déjà traitée.');

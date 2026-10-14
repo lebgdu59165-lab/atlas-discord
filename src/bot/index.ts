@@ -7,6 +7,7 @@ import { AppError } from '../lib/errors';
 import { variables, levelOf } from '../shared/catalog';
 import { execute, openTicket, ticketAction, setRole, sanction, sendText, automation } from './actions';
 import { pollTwitch } from './twitch';
+import { dispatchCommand } from './commands';
 const intents=[GatewayIntentBits.Guilds,GatewayIntentBits.GuildMessages,GatewayIntentBits.GuildVoiceStates];
 if(process.env.DISCORD_MEMBERS_INTENT==='true')intents.push(GatewayIntentBits.GuildMembers);
 if(process.env.DISCORD_MESSAGE_CONTENT_INTENT==='true')intents.push(GatewayIntentBits.MessageContent);
@@ -128,12 +129,7 @@ client.on(Events.InteractionCreate,safe(async interaction=>{
     }
     if(interaction.isChatInputCommand()) {
       await interaction.deferReply();
-      const records=await db.entity.findMany({where:{guildId:interaction.guildId!,module:'commands',status:'active'}}),record=records.find(r=>(r.data as any).name===interaction.commandName);
-      if(!record || !(record.data as any).enabled)throw new AppError(404,'Commande désactivée.');
-      const d=record.data as any,member=await interaction.guild.members.fetch(interaction.user.id);
-      if(d.allowedRoles.length && !member.roles.cache.some((r:any)=>d.allowedRoles.includes(r.id)))throw new AppError(403,'Rôle requis pour cette commande.');
-      if(d.cooldown>0 && !await redis().set(`cmd:${interaction.guildId}:${record.id}:${interaction.user.id}`,'1','EX',d.cooldown,'NX'))throw new AppError(429,'Cette commande est en cooldown.');
-      await interaction.editReply({content:variables(d.response,{user:`<@${interaction.user.id}>`,server:interaction.guild.name,memberCount:interaction.guild.memberCount}).slice(0,2000),allowedMentions:{parse:[]}});await metric(interaction.guildId!,'commands');await audit(interaction.guildId!,interaction.user.id,'command.used',{name:d.name});
+      await dispatchCommand(interaction);
     }
   }catch(error){const message=error instanceof AppError?error.message:'Discord a refusé l’action. Vérifiez les permissions du bot.';if(interaction.isRepliable()){if(interaction.deferred||interaction.replied)await interaction.editReply(message);else await interaction.reply({content:message,flags:64});}}
 }));
