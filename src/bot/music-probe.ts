@@ -19,6 +19,7 @@ try{
  await db.globalSetting.upsert({where:{key:'audioProbe'},create:{key:'audioProbe',value:json(result)},update:{value:json(result)}});
  console.log('Audio validation:',JSON.stringify(result));
 }catch{
+ process.exitCode=1;
  const result={ok:false,stage,error:'Test audio externe indisponible. Consultez les permissions vocales et la disponibilité YouTube.',platform:process.platform,checkedAt:new Date().toISOString()};
  await db.globalSetting.upsert({where:{key:'audioProbe'},create:{key:'audioProbe',value:json(result)},update:{value:json(result)}}).catch(()=>{});
  console.error(result.error);

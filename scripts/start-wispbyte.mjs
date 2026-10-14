@@ -40,9 +40,10 @@ if(!await prismaClientReady()){
 
 // Validate the audio dependencies once per package lock, without joining a voice channel.
 const audioStamp='node_modules/.atlas-audio.sha256';
-if(await readFile(audioStamp,'utf8').catch(()=>'')!==lockHash){
- await new Promise(resolve=>{const child=spawn(process.execPath,['bot-build/music-probe.mjs'],{stdio:'inherit',windowsHide:true});child.once('error',resolve);child.once('exit',resolve);});
- await writeFile(audioStamp,lockHash);
+const audioHash=createHash('sha256').update(lockHash).update(await readFile('bot-build/music-probe.mjs')).digest('hex');
+if(await readFile(audioStamp,'utf8').catch(()=>'')!==audioHash){
+ const code=await new Promise(resolve=>{const child=spawn(process.execPath,['bot-build/music-probe.mjs'],{stdio:'inherit',windowsHide:true});const timer=setTimeout(()=>child.kill(),90000);child.once('error',()=>{clearTimeout(timer);resolve(1);});child.once('exit',code=>{clearTimeout(timer);resolve(code??1);});});
+ if(code===0)await writeFile(audioStamp,audioHash);
 }
 
 await import('./start-discloud.mjs');
