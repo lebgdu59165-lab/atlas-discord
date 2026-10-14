@@ -6,6 +6,7 @@ import {AppError} from '../lib/errors';
 import {config,json} from '../services/store';
 import {db} from '../lib/db';
 import {publish} from '../lib/redis';
+import {youtubeAudioStream} from './youtube-stream';
 type Track={id:string;title:string;requestedBy:string;url?:string};
 type Session={guild:Guild;channelId:string;player:any;connection:any;queue:Track[];current:Track|null;volume:number;loop:boolean;resource:any;source:Readable|null;process:ReturnType<typeof spawn>|null;timer:ReturnType<typeof setTimeout>|null;loading:boolean;generation:number;error:string|null};
 const sessions=new Map<string,Session>();
@@ -38,7 +39,7 @@ export function discordAudioUrl(value:string){
 }
 async function trackStream(track:Track){
  if(track.url){const url=discordAudioUrl(track.url);if(!url)throw new AppError(400,'Source audio invalide.');const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),20000);let response:Response;try{response=await fetch(url,{redirect:'error',signal:controller.signal});}finally{clearTimeout(timer);}if(!response.ok||!response.body)throw new AppError(502,'Le fichier audio est inaccessible ou son lien a expiré. Copiez à nouveau son lien depuis Discord.');return response.body;}
- return (await youtube()).download(track.id,{type:'audio',quality:'best',format:'any',client:'ANDROID_VR'});
+ return youtubeAudioStream(track.id);
 }
 export async function findTrack(query:string,userId:string):Promise<Track>{
  try{const audio=discordAudioUrl(query);if(audio)return {id:audio.pathname.split('/').slice(-2).join('/'),title:decodeURIComponent(audio.pathname.split('/').at(-1)!).slice(0,200),requestedBy:userId,url:audio.href};const yt=await youtube();let id=youtubeId(query);
@@ -91,7 +92,7 @@ async function performMusicAction(guild:Guild,userId:string,action:string,value?
  }
  const s=sessions.get(guild.id);if(!s)throw new AppError(409,'Le bot n’est pas dans un salon vocal. Utilisez /join ou /play.');await requireUser(guild,userId,s.channelId);
  if(action==='queue')return s.queue.length?s.queue.map((t,n)=>`${n+1}. ${t.title}`).join('\n'):'La file d’attente est vide.';
- if(action==='nowplaying')return s.current?`${s.current.title}\nhttps://www.youtube.com/watch?v=${s.current.id}`:'Aucune musique en cours.';
+ if(action==='nowplaying')return s.current?`${s.current.title}\n${s.current.url??`https://www.youtube.com/watch?v=${s.current.id}`}`:'Aucune musique en cours.';
  if(action==='stop'){await disconnect(s);return 'Lecture arrêtée, file vidée et salon vocal quitté.';}
  if(action==='pause'){if(!s.player.pause())throw new AppError(409,'Aucune lecture à mettre en pause.');}
  else if(action==='resume'){if(!s.player.unpause())throw new AppError(409,'Aucune lecture en pause.');}

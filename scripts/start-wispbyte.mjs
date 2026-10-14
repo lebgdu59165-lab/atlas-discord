@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
 import { setTimeout as pause } from 'node:timers/promises';
 import { prismaClientReady } from './prisma-ready.mjs';
+import {ensureMediaRuntime} from './media-runtime.mjs';
 
 // Wispbyte lance ce fichier directement, avant l'installation des dépendances.
 // Le bot rejoint ensuite le même processus, sans lanceur permanent supplémentaire.
@@ -39,10 +40,11 @@ if(!await prismaClientReady()){
 }else console.log('Client Prisma déjà généré pour ce schéma ; lancement direct du bot.');
 
 // Validate the audio dependencies once per package lock, without joining a voice channel.
+try{await ensureMediaRuntime();}catch{console.error('Le moteur YouTube est indisponible ; les autres commandes restent utilisables.');}
 const audioStamp='node_modules/.atlas-audio.sha256';
 const audioHash=createHash('sha256').update(lockHash).update(await readFile('bot-build/music-probe.mjs')).digest('hex');
 if(await readFile(audioStamp,'utf8').catch(()=>'')!==audioHash){
- const code=await new Promise(resolve=>{const child=spawn(process.execPath,['bot-build/music-probe.mjs'],{stdio:'inherit',windowsHide:true});const timer=setTimeout(()=>child.kill(),90000);child.once('error',()=>{clearTimeout(timer);resolve(1);});child.once('exit',code=>{clearTimeout(timer);resolve(code??1);});});
+ const code=await new Promise(resolve=>{const child=spawn(process.execPath,['bot-build/music-probe.mjs'],{stdio:'inherit',windowsHide:true});const timer=setTimeout(()=>child.kill(),140000);child.once('error',()=>{clearTimeout(timer);resolve(1);});child.once('exit',code=>{clearTimeout(timer);resolve(code??1);});});
  if(code===0)await writeFile(audioStamp,audioHash);
 }
 

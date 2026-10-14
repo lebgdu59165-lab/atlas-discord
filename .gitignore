@@ -8,3 +8,4 @@ coverage/
 backups/
 *.log
 bot-build/
+.cache/

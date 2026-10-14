@@ -5,6 +5,7 @@ const mocks=vi.hoisted(()=>({config:vi.fn(async()=>({value:{enabled:true,default
 vi.mock('../src/services/store',()=>({config:mocks.config,json:(v:unknown)=>v}));
 vi.mock('../src/lib/db',()=>({db:{entity:{upsert:mocks.store}}}));
 vi.mock('../src/lib/redis',()=>({publish:vi.fn()}));
+vi.mock('../src/bot/youtube-stream',()=>({youtubeAudioStream:mocks.download}));
 vi.mock('youtubei.js',()=>({Platform:{shim:{}},Innertube:{create:async()=>({search:async(q:string)=>({videos:[{id:q==='second'?'bbbbbbbbbbb':'aaaaaaaaaaa'}]}),getBasicInfo:async(id:string)=>({playability_status:{status:'OK'},basic_info:{title:id}}),download:mocks.download})}}));
 vi.mock('node:child_process',async()=>{const {PassThrough}=await import('node:stream'),{EventEmitter}=await import('node:events');return {spawn:()=>{const p:any=new EventEmitter();p.stdin=new PassThrough();p.stdout=new PassThrough();p.kill=()=>{p.stdin.destroy();p.stdout.destroy();return true;};return p;}};});
 vi.mock('@discordjs/voice',async()=>{const {EventEmitter}=await import('node:events');return {
@@ -35,7 +36,7 @@ describe('Music queue and voice controls',()=>{
   expect(request).toHaveBeenCalledWith(expect.any(URL),expect.objectContaining({redirect:'error'}));expect(mocks.download.mock.calls.length).toBe(before);expect(latest().current.title).toBe('musique.mp3');await musicAction(guild,U,'pause');expect(latest().paused).toBe(true);
  });
  it('joins one voice session, plays audio with the working client and supports the queue controls',async()=>{
-  await musicAction(guild,U,'join');expect(mocks.connect).toHaveBeenCalledOnce();await musicAction(guild,U,'play',undefined,'first');expect(mocks.download).toHaveBeenCalledWith('aaaaaaaaaaa',expect.objectContaining({client:'ANDROID_VR',type:'audio'}));
+  await musicAction(guild,U,'join');expect(mocks.connect).toHaveBeenCalledOnce();await musicAction(guild,U,'play',undefined,'first');expect(mocks.download).toHaveBeenCalledWith('aaaaaaaaaaa');
   await musicAction(guild,U,'play',undefined,'second');expect(await musicAction(guild,U,'queue')).toContain('bbbbbbbbbbb');expect(await musicAction(guild,U,'nowplaying')).toContain('aaaaaaaaaaa');
   await musicAction(guild,U,'pause');expect(latest().paused).toBe(true);await musicAction(guild,U,'resume');expect(latest().paused).toBe(false);await musicAction(guild,U,'volume',25);expect(latest().volume).toBe(25);
   await musicAction(guild,U,'loop');expect(latest().loop).toBe(true);await musicAction(guild,U,'shuffle');expect(latest().queue).toHaveLength(1);await musicAction(guild,U,'remove',1);expect(latest().queue).toHaveLength(0);

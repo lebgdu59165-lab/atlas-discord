@@ -4,7 +4,7 @@ import {spawnSync} from 'node:child_process';
 
 const output=resolve('../atlas-bot-discloud');
 const pkg=JSON.parse(await readFile('package.json','utf8'));
-for(const file of ['bot-build/index.mjs','bot-build/index.mjs.LEGAL.txt','bot-build/music-probe.mjs','bot-build/music-probe.mjs.LEGAL.txt','scripts/start-discloud.mjs','scripts/start-wispbyte.mjs','scripts/prisma-ready.mjs','scripts/check-production.mjs','prisma/schema.prisma','certs/aiven-ca.pem','discloud.config','.env.example','.gitignore','.discloudignore']){
+for(const file of ['bot-build/index.mjs','bot-build/index.mjs.LEGAL.txt','bot-build/music-probe.mjs','bot-build/music-probe.mjs.LEGAL.txt','scripts/start-discloud.mjs','scripts/start-wispbyte.mjs','scripts/media-runtime.mjs','scripts/prisma-ready.mjs','scripts/check-production.mjs','prisma/schema.prisma','certs/aiven-ca.pem','discloud.config','.env.example','.gitignore','.discloudignore']){
   const destination=resolve(output,file);await mkdir(dirname(destination),{recursive:true});await copyFile(file,destination);
 }
 await writeFile(resolve(output,'package.json'),JSON.stringify({name:'atlas-bot-discloud',version:pkg.version,private:true,type:'module',engines:{node:'>=22.12'},allowScripts:Object.fromEntries(Object.entries(pkg.allowScripts).filter(([key])=>!key.startsWith('esbuild@'))),scripts:{start:'node scripts/start-discloud.mjs','db:generate':'prisma generate'},dependencies:Object.fromEntries(['@prisma/client','prisma','dotenv','@discordjs/voice','youtubei.js','ffmpeg-static','opusscript','quickjs-emscripten','sharp'].map(key=>[key,pkg.dependencies[key]])),overrides:pkg.overrides},null,2)+'\n');
