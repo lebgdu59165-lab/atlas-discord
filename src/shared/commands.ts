@@ -360,12 +360,12 @@ export const builtinCommands:NativeCommandDefinition[]=[
   },
   {
     "name": "play",
-    "description": "Jouer une musique (YouTube ou recherche)",
+    "description": "Jouer une musique (YouTube, recherche ou fichier audio Discord)",
     "options": [
       {
         "type": 3,
         "name": "recherche",
-        "description": "Titre à rechercher ou lien YouTube",
+        "description": "Titre, lien YouTube ou lien d’un fichier audio Discord",
         "required": true,
         "max_length": 1000
       }

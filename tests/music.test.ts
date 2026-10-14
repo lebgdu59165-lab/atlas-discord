@@ -12,15 +12,28 @@ vi.mock('@discordjs/voice',async()=>{const {EventEmitter}=await import('node:eve
  joinVoiceChannel:()=>{mocks.connect();const c:any=new EventEmitter();c.state={status:'ready'};c.subscribe=vi.fn();c.destroy=()=>{c.state={status:'destroyed'};};return c;},entersState:async(c:any)=>c,
  createAudioPlayer:()=>{const p:any=new EventEmitter();p.state={status:'idle'};p.play=()=>{p.state={status:'playing'};};p.pause=()=>{const ok=p.state.status==='playing';if(ok)p.state={status:'paused'};return ok;};p.unpause=()=>{const ok=p.state.status==='paused';if(ok)p.state={status:'playing'};return ok;};p.stop=()=>{p.state={status:'idle'};p.emit('idle');return true;};return p;},createAudioResource:()=>({volume:{setVolume:vi.fn()}})
  };});
-import {musicAction} from '../src/bot/music';
+import {musicAction,findTrack,discordAudioUrl} from '../src/bot/music';
 const G='933333333333333333',U='944444444444444444';
 let voiceId='955555555555555555';
 const channel={id:voiceId,type:ChannelType.GuildVoice,permissionsFor:()=>({has:()=>true})};
 const guild:any={id:G,client:{user:{id:'bot'}},voiceAdapterCreator:{},members:{fetch:async()=>({voice:{channelId:voiceId,channel}}),fetchMe:async()=>({id:'bot'})}};
 mocks.download.mockImplementation(async()=>new ReadableStream({start(c){c.enqueue(new Uint8Array([1,2,3,4]));c.close();}}));
-afterEach(async()=>{voiceId=channel.id;try{await musicAction(guild,U,'stop');}catch{}mocks.config.mockResolvedValue({value:{enabled:true,defaultVolume:50,maxQueue:50,idleSeconds:120}});});
+afterEach(async()=>{voiceId=channel.id;try{await musicAction(guild,U,'stop');}catch{}vi.unstubAllGlobals();mocks.config.mockResolvedValue({value:{enabled:true,defaultVolume:50,maxQueue:50,idleSeconds:120}});});
 const latest=()=>mocks.store.mock.calls.at(-1)![0].update.data;
 describe('Music queue and voice controls',()=>{
+ it('accepts audio attachments without requiring YouTube and rejects unsafe attachment URLs',async()=>{
+  const link='https://cdn.discordapp.com/attachments/933333333333333333/944444444444444444/musique.mp3?ex=abc';
+  expect(await findTrack(link,U)).toMatchObject({title:'musique.mp3',url:link});
+  expect(discordAudioUrl('https://localhost/test.mp3')).toBeNull();
+  expect(()=>discordAudioUrl(link.replace('https:','http:'))).toThrow();
+  expect(()=>discordAudioUrl(link.replace('musique.mp3','script.js'))).toThrow();
+  expect(()=>discordAudioUrl(link.replace('cdn.discordapp.com','user:password@cdn.discordapp.com'))).toThrow();
+ });
+ it('streams Discord audio through the same player without following redirects or calling YouTube',async()=>{
+  const request=vi.fn(async()=>new Response(new Uint8Array([1,2,3,4])));vi.stubGlobal('fetch',request);const before=mocks.download.mock.calls.length;
+  await musicAction(guild,U,'play',undefined,'https://cdn.discordapp.com/attachments/933333333333333333/944444444444444444/musique.mp3');
+  expect(request).toHaveBeenCalledWith(expect.any(URL),expect.objectContaining({redirect:'error'}));expect(mocks.download.mock.calls.length).toBe(before);expect(latest().current.title).toBe('musique.mp3');await musicAction(guild,U,'pause');expect(latest().paused).toBe(true);
+ });
  it('joins one voice session, plays audio with the working client and supports the queue controls',async()=>{
   await musicAction(guild,U,'join');expect(mocks.connect).toHaveBeenCalledOnce();await musicAction(guild,U,'play',undefined,'first');expect(mocks.download).toHaveBeenCalledWith('aaaaaaaaaaa',expect.objectContaining({client:'ANDROID_VR',type:'audio'}));
   await musicAction(guild,U,'play',undefined,'second');expect(await musicAction(guild,U,'queue')).toContain('bbbbbbbbbbb');expect(await musicAction(guild,U,'nowplaying')).toContain('aaaaaaaaaaa');

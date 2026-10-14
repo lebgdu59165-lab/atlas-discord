@@ -32,7 +32,7 @@ Les durées de `/mute`, `/giveaway` et `/remind` sont en **minutes**. `/unban us
 | /givexp | Niveaux | Donner de l'XP à un membre (admin) |
 | /resetxp | Niveaux | Remettre l'XP d'un membre à 0 (admin) |
 | /join | Musique | Rejoindre ton salon vocal |
-| /play | Musique | Jouer une musique (YouTube ou recherche) |
+| /play | Musique | Jouer une musique (YouTube, recherche ou fichier audio Discord) |
 | /pause | Musique | Mettre en pause |
 | /resume | Musique | Reprendre la lecture |
 | /skip | Musique | Passer à la musique suivante |
@@ -80,7 +80,7 @@ Les durées de `/mute`, `/giveaway` et `/remind` sont en **minutes**. `/unban us
 ## Réglages et limites
 
 - Le tableau de bord permet de désactiver des commandes intégrées, de régler le préfixe, l’économie, les niveaux, le volume initial et la taille de file musicale.
-- Musique : rejoignez un salon vocal standard, puis `/play recherche:titre ou lien YouTube`. Le bot doit pouvoir se connecter et parler ; seuls les membres de ce salon contrôlent le lecteur. La file se vide au redémarrage. Les restrictions et pannes YouTube peuvent empêcher certains morceaux.
+- Musique : rejoignez un salon vocal standard, puis `/play recherche:titre ou lien YouTube`. Vous pouvez aussi envoyer un fichier audio sur Discord, copier son lien et le donner à `/play`. Seuls les liens HTTPS des pièces jointes audio Discord sont acceptés pour cette seconde source. Un lien expiré doit être recopié. Le bot doit pouvoir se connecter et parler ; seuls les membres de ce salon contrôlent le lecteur. La file se vide au redémarrage. Le test sur Wispbyte a constaté un refus de YouTube : les recherches et liens YouTube ne sont donc pas garantis sur cet hébergeur.
 - `/poll` crée un sondage Oui/Non avec boutons. `/giveaway` publie un bouton Participer, déduplique les inscriptions et utilise un tirage cryptographique. Les votes et participations sont conservés dans PostgreSQL.
 - `/remind` conserve la programmation dans PostgreSQL et envoie un message privé ; l’envoi échoue si les messages privés sont fermés. Le contenu est masqué aux autres membres dans le suivi des tâches.
 - `/shop` affiche les articles existants et leur page d’achat ; une boutique vide est signalée comme telle.
@@ -88,4 +88,4 @@ Les durées de `/mute`, `/giveaway` et `/remind` sont en **minutes**. `/unban us
 
 ## Validation
 
-Inventaire exact des 70 noms et 70 gestionnaires distincts, tests de permissions, validation des entrées, file musicale et opérations PostgreSQL concurrentes. Les actions destructrices de modération n’ont pas été exécutées sur des membres ou salons réels pour la recette. Un test audio reçoit un flux YouTube, le décode avec FFmpeg et l’encode en Opus sans rejoindre de salon ; une écoute réelle reste une vérification distincte.
+Inventaire exact des 70 noms et 70 gestionnaires distincts, tests de permissions, validation des entrées, file musicale et opérations PostgreSQL concurrentes. Les actions destructrices de modération n’ont pas été exécutées sur des membres ou salons réels pour la recette. Le contrôle audio décode un WAV généré avec FFmpeg et l’encode en Opus, puis teste séparément YouTube sans rejoindre de salon ; une écoute réelle reste une vérification distincte.

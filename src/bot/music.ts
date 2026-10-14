@@ -6,7 +6,7 @@ import {AppError} from '../lib/errors';
 import {config,json} from '../services/store';
 import {db} from '../lib/db';
 import {publish} from '../lib/redis';
-type Track={id:string;title:string;requestedBy:string};
+type Track={id:string;title:string;requestedBy:string;url?:string};
 type Session={guild:Guild;channelId:string;player:any;connection:any;queue:Track[];current:Track|null;volume:number;loop:boolean;resource:any;source:Readable|null;process:ReturnType<typeof spawn>|null;timer:ReturnType<typeof setTimeout>|null;loading:boolean;generation:number;error:string|null};
 const sessions=new Map<string,Session>();
 export const musicNames=['join','play','pause','resume','skip','stop','queue','volume','loop','nowplaying','remove','shuffle'];
@@ -30,8 +30,18 @@ export function youtubeId(value:string){
  if(host==='youtu.be')id=url.pathname.slice(1);else if(host==='youtube.com'||host==='m.youtube.com'||host==='music.youtube.com')id=url.pathname==='/watch'?url.searchParams.get('v'):/^\/(shorts|live|embed)\//.test(url.pathname)?url.pathname.split('/')[2]:null;
  if(!id||! /^[\w-]{11}$/.test(id))throw new AppError(400,'Lien YouTube invalide. Les autres sites ne sont pas acceptés.');return id;
 }
+export function discordAudioUrl(value:string){
+ if(!/^https?:\/\//i.test(value))return null;
+ const url=new URL(value);if(!['cdn.discordapp.com','media.discordapp.net'].includes(url.hostname))return null;
+ if(url.protocol!=='https:'||url.username||url.password||url.port||!/^\/attachments\/\d{17,20}\/\d{17,20}\/[^/]+\.(mp3|wav|ogg|opus|m4a|aac|flac|webm)$/i.test(url.pathname)||value.length>2000)throw new AppError(400,'Utilisez le lien HTTPS d’un fichier audio envoyé sur Discord.');
+ return url;
+}
+async function trackStream(track:Track){
+ if(track.url){const url=discordAudioUrl(track.url);if(!url)throw new AppError(400,'Source audio invalide.');const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),20000);let response:Response;try{response=await fetch(url,{redirect:'error',signal:controller.signal});}finally{clearTimeout(timer);}if(!response.ok||!response.body)throw new AppError(502,'Le fichier audio est inaccessible ou son lien a expiré. Copiez à nouveau son lien depuis Discord.');return response.body;}
+ return (await youtube()).download(track.id,{type:'audio',quality:'best',format:'any',client:'ANDROID_VR'});
+}
 export async function findTrack(query:string,userId:string):Promise<Track>{
- try{const yt=await youtube();let id=youtubeId(query);
+ try{const audio=discordAudioUrl(query);if(audio)return {id:audio.pathname.split('/').slice(-2).join('/'),title:decodeURIComponent(audio.pathname.split('/').at(-1)!).slice(0,200),requestedBy:userId,url:audio.href};const yt=await youtube();let id=youtubeId(query);
   if(!id){const results=await yt.search(query,{type:'video'});id=results.videos.find((v:any)=>v.id)?.id??null;}
   if(!id)throw new AppError(404,'Aucun morceau trouvé.');const info=await yt.getBasicInfo(id);if(info.playability_status?.status!=='OK')throw new AppError(502,'YouTube refuse la lecture de cette vidéo. Essayez un autre lien public.');
   return {id,title:String(info.basic_info.title??'Vidéo YouTube').slice(0,200),requestedBy:userId};
@@ -47,7 +57,7 @@ async function playNext(s:Session){
  if(s.timer){clearTimeout(s.timer);s.timer=null;}killAudio(s);const next=s.loop&&s.current?s.current:s.queue.shift()??null;s.current=next;
  try{
   if(!next){await persist(s);await idle(s);return;}
-  const yt=await youtube(),web=await yt.download(next.id,{type:'audio',quality:'best',format:'any',client:'ANDROID_VR'});if(generation!==s.generation){await web.cancel();return;}
+  const web=await trackStream(next);if(generation!==s.generation){await web.cancel();return;}
   const [{default:ffmpeg},voice]=await Promise.all([import('ffmpeg-static'),import('@discordjs/voice')]);if(!ffmpeg)throw new Error('FFmpeg unavailable');
   const proc=spawn(ffmpeg,['-hide_banner','-loglevel','error','-protocol_whitelist','pipe','-i','pipe:0','-analyzeduration','0','-f','s16le','-ar','48000','-ac','2','pipe:1'],{stdio:['pipe','pipe','ignore'],windowsHide:true});
   proc.on('error',()=>{s.error='Le moteur audio n’a pas pu démarrer.';s.player.stop(true);});
