@@ -14,4 +14,6 @@ Les actualisations protègent les formulaires et les réglages non enregistrés.
 
 La couverture fonctionnelle détaillée reste dans `COUVERTURE.md`. Cette amélioration ne déclare pas terminées les fonctions encore partielles. Render Free peut démarrer lentement après une période sans visite ; Wispbyte Free demande une reconnexion au compte toutes les deux semaines.
 
+Le panneau Wispbyte signale plusieurs arrêts pour dépassement CPU, y compris avec une moyenne indiquée de 15,02 %. Les règles de partage des ressources de l’hébergeur restent applicables. Le worker vérifie désormais les actions toutes les 2,5 secondes au lieu de chaque seconde et le décodage audio utilise un seul thread. La continuité 24 h/24 ne peut pas être garantie sur cet hébergement gratuit.
+
 Validation : construction de production, 115 tests unitaires et 28 tests sur PostgreSQL isolé. Les parcours ont été contrôlés sur l’interface réelle avec des données de démonstration locales, sur écran de bureau et mobile. Les actions de modération réelles et les messages de test sur le serveur communautaire ne font pas partie de cette recette.

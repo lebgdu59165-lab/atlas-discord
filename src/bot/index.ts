@@ -26,7 +26,7 @@ client.once(Events.ClientReady,safe(async()=>{
   for(const guild of client.guilds.cache.values())await track(guild);
   await db.entity.updateMany({where:{guildId:{in:[...client.guilds.cache.keys()]},module:'music-state'},data:{status:'offline',data:json({connected:false,current:null,queue:[],checkedAt:new Date().toISOString()})}});
   await db.job.updateMany({where:{status:'running',lockedAt:{lt:new Date(Date.now()-300000)}},data:{status:'failed',error:'Exécution interrompue : vérifier Discord avant de relancer manuellement.'}});
-  setInterval(safe(heartbeat),15000).unref();setInterval(safe(work),1000).unref();setInterval(safe(expireBans),30000).unref();
+  setInterval(safe(heartbeat),15000).unref();setInterval(safe(work),2500).unref();setInterval(safe(expireBans),30000).unref();
   setInterval(safe(async()=>{for(const guild of client.guilds.cache.values())await track(guild);}),60000).unref();
   setInterval(safe(cleanup),3600000).unref();setInterval(safe(closeDue),60000).unref();
   setInterval(safe(()=>pollTwitch(client)),60000).unref();

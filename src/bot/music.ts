@@ -62,7 +62,7 @@ async function playNext(s:Session){
   if(!next){await persist(s);await idle(s);return;}
   const web=await trackStream(next);if(generation!==s.generation){await web.cancel();return;}
   const [{default:ffmpeg},voice]=await Promise.all([import('ffmpeg-static'),import('@discordjs/voice')]);if(!ffmpeg)throw new Error('FFmpeg unavailable');
-  const proc=spawn(ffmpeg,['-hide_banner','-loglevel','error','-protocol_whitelist','pipe','-i','pipe:0','-analyzeduration','0','-f','s16le','-ar','48000','-ac','2','pipe:1'],{stdio:['pipe','pipe','ignore'],windowsHide:true});
+  const proc=spawn(ffmpeg,['-hide_banner','-loglevel','error','-threads','1','-protocol_whitelist','pipe','-i','pipe:0','-analyzeduration','0','-threads','1','-f','s16le','-ar','48000','-ac','2','pipe:1'],{stdio:['pipe','pipe','ignore'],windowsHide:true});
   proc.on('error',()=>{s.error='Le moteur audio n’a pas pu démarrer.';s.player.stop(true);});
   const source=Readable.fromWeb(web as any);source.on('error',()=>{s.error='Le flux YouTube a été interrompu.';s.player.stop(true);});proc.stdin.on('error',()=>{});source.pipe(proc.stdin);
   s.source=source;s.process=proc;s.resource=voice.createAudioResource(proc.stdout,{inputType:voice.StreamType.Raw,inlineVolume:true});s.resource.volume!.setVolume(s.volume/100);s.error=null;s.player.play(s.resource);await voice.entersState(s.player,voice.AudioPlayerStatus.Playing,15000);await persist(s);
