@@ -4,6 +4,7 @@ import {AppError} from '../lib/errors';
 import {staff} from './command-actions';
 import {createRecord,json,audit} from '../services/store';
 import {PermissionFlagsBits as P} from 'discord.js';
+import {responseEmbed} from './presentation';
 export const communityHandlers:Record<string,(i:CI)=>Promise<unknown>>={};
 for(const name of ['poll','giveaway'])communityHandlers[name]=async i=>{
  await staff(i,'content',P.ManageMessages);if(!i.channel?.isTextBased()||!('send'in i.channel))throw new AppError(400,'Choisissez un salon textuel.');
@@ -15,7 +16,7 @@ for(const name of ['poll','giveaway'])communityHandlers[name]=async i=>{
   const buttons=giveaway?[new ButtonBuilder().setCustomId(`community:giveaway:${record.id}`).setLabel('Participer').setStyle(ButtonStyle.Primary)]:['Oui','Non'].map((label,n)=>new ButtonBuilder().setCustomId(`community:poll:${record.id}:${n}`).setLabel(label).setStyle(n===0?ButtonStyle.Success:ButtonStyle.Secondary));
   const message=await i.channel.send({embeds:[new EmbedBuilder().setTitle(title.slice(0,256)).setDescription(`${giveaway?`${winners} gagnant(s) · cliquez sur Participer`:'Cliquez sur Oui ou Non pour voter'}\nFin : <t:${Math.floor(new Date(endsAt).getTime()/1000)}:R>`).setColor('#7c6aff')],components:[new ActionRowBuilder<ButtonBuilder>().addComponents(buttons)],allowedMentions:{parse:[]}});
   await db.entity.update({where:{id:record.id},data:{data:json({...record.data as object,channelId:i.channelId,messageId:message.id})}});
-  return i.editReply({content:`${giveaway?'Giveaway':'Sondage'} publié : ${message.url}`,allowedMentions:{parse:[]}});
+  return i.editReply({embeds:[responseEmbed(giveaway?'Concours publié':'Sondage publié',`Votre communauté peut participer ici : ${message.url}`,'success')],allowedMentions:{parse:[]}});
  }catch(e){await db.entity.update({where:{id:record.id},data:{status:'failed'}});throw e;}
 };
 export async function deliverReminder(client:Client,job:any){

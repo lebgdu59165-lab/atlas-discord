@@ -2,14 +2,14 @@ import {beforeAll,afterAll,beforeEach,describe,it,expect,vi} from 'vitest';
 // Discord network boundaries are controlled here; PostgreSQL is real and isolated.
 const discordMock=vi.hoisted(()=>vi.fn());
 vi.mock('../src/lib/discord',async original=>({...await original<any>(),discord:discordMock}));
-vi.mock('../src/lib/redis',()=>({publish:vi.fn(),rateLimit:vi.fn()}));
+vi.mock('../src/lib/redis',()=>({publish:vi.fn(),rateLimit:vi.fn(),redis:()=>({get:async()=>null,set:async()=> 'OK'})}));
 import {db} from '../src/lib/db';
 import {authorize,requireOwner,authenticate} from '../src/lib/auth';
 import {hash} from '../src/lib/crypto';
 import {config,saveConfig,createRecord,getRecord,updateRecord,deleteRecord} from '../src/services/store';
 import {economy,participate,decision} from '../src/services/community';
 import {defaults,byId} from '../src/shared/catalog';
-import {DELETE as apiDelete} from '../src/app/api/[...path]/route';
+import {DELETE as apiDelete,GET as apiGet} from '../src/app/api/[...path]/route';
 const A='111111111111111111',B='222222222222222222',USER='333333333333333333',OTHER='444444444444444444';
 beforeAll(async()=>{
   if(!process.env.DATABASE_URL?.includes('atlas_test'))throw new Error('Use an isolated DATABASE_URL containing atlas_test. Never use a production database.');
@@ -32,6 +32,8 @@ describe('Tenant isolation and revocation',()=>{
     expect((await authenticate(new Request('http://localhost:3000/api/guilds',{method:'POST',headers:{...headers,origin:'http://localhost:3000'}}))).userId).toBe(USER);
   });
   it('owner of one server cannot read another without permission',async()=>{expect((await authorize(A,USER,'config')).admin).toBe(true);await expect(authorize(B,USER,'config')).rejects.toMatchObject({status:403});});
+  it('requires configuration permission before reading the guild directory',async()=>{const response=await apiGet(new Request(`http://localhost:3000/api/guilds/${B}/directory`,{headers:{cookie:'atlas_session=integration-session'}}),{params:Promise.resolve({path:['guilds',B,'directory']})});expect(response.status).toBe(403);expect(discordMock.mock.calls.some(([path])=>path.endsWith('/channels'))).toBe(false);});
+  it('returns channel names and excludes roles outside the bot hierarchy from assignment',async()=>{const previous=process.env.DISCORD_CLIENT_ID;process.env.DISCORD_CLIENT_ID='999999999999999999';discordMock.mockImplementation(async(path:string)=>path.endsWith('/channels')?[{id:'text',name:'annonces',type:0,position:0}]:path.endsWith('/roles')?[{id:A,name:'everyone',position:0,permissions:'0'},{id:'higher',name:'Admin',position:10,permissions:'0'},{id:'bot',name:'Atlas',position:5,permissions:'0',managed:true},{id:'lower',name:'Membre',position:1,permissions:'0',managed:false}]:{roles:path.endsWith('/999999999999999999')?['bot']:[]});try{const response=await apiGet(new Request(`http://localhost:3000/api/guilds/${A}/directory`,{headers:{cookie:'atlas_session=integration-session'}}),{params:Promise.resolve({path:['guilds',A,'directory']})});expect(response.status).toBe(200);const directory=await response.json();expect(directory.channels).toEqual([{id:'text',name:'annonces',type:0}]);expect(directory.roles).toContainEqual({id:'lower',name:'Membre',managed:false,manageable:true});expect(directory.roles.find((r:any)=>r.id==='higher').manageable).toBe(false);expect(directory.roles.find((r:any)=>r.id==='bot').manageable).toBe(false);expect(directory.roles.some((r:any)=>r.id===A)).toBe(false);}finally{if(previous===undefined)delete process.env.DISCORD_CLIENT_ID;else process.env.DISCORD_CLIENT_ID=previous;}});
   it('global owner never bypasses Discord guild authorization',async()=>{process.env.OWNER_DISCORD_ID=USER;expect(()=>requireOwner(USER)).not.toThrow();await expect(authorize(B,USER,'config')).rejects.toMatchObject({status:403});});
   it('delegated permissions apply only to their guild and requested operation',async()=>{await db.grant.upsert({where:{guildId_userId:{guildId:A,userId:OTHER}},create:{guildId:A,userId:OTHER,permissions:['tickets']},update:{permissions:['tickets']}});expect((await authorize(A,OTHER,'tickets')).permissions).toEqual(['tickets']);await expect(authorize(A,OTHER,'economy')).rejects.toMatchObject({status:403});await db.grant.delete({where:{guildId_userId:{guildId:A,userId:OTHER}}});await expect(authorize(A,OTHER,'tickets')).rejects.toMatchObject({status:403});});
   it('a grant cannot authorize a user who left Discord',async()=>{await db.grant.create({data:{guildId:A,userId:OTHER,permissions:['config']}});discordMock.mockImplementation(async()=>{throw new Error('Not a guild member');});await expect(authorize(A,OTHER,'config')).rejects.toThrow();await db.grant.delete({where:{guildId_userId:{guildId:A,userId:OTHER}}});});

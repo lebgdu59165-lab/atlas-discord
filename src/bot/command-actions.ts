@@ -9,8 +9,9 @@ import {economy} from '../services/community';
 import {sanction,setRole,guardTarget,automation} from './actions';
 import {levelOf,snowflake} from '../shared/catalog';
 import {positiveAmount,rollDice,calculate,decodeBase64} from '../lib/command-tools';
+import {responseEmbed} from './presentation';
 export type CI=ChatInputCommandInteraction;
-const content=(i:CI,text:string)=>i.editReply({content:text.slice(0,2000),allowedMentions:{parse:[]}});
+const content=(i:CI,text:string)=>i.editReply({embeds:[responseEmbed(i.commandName?`Commande /${i.commandName}`:'Atlas',text)],allowedMentions:{parse:[]}});
 export async function staff(i:CI,permission:any,flag?:bigint){
  const member=await i.guild!.members.fetch(i.user.id);
  if(i.user.id===i.guild!.ownerId||member.permissions.has(P.Administrator)||(flag&&member.permissions.has(flag)))return member;

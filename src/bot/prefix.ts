@@ -3,6 +3,7 @@ import {builtinCommands} from '../shared/commands';
 import {config} from '../services/store';
 import {dispatchCommand} from './commands';
 import {AppError} from '../lib/errors';
+import {interactionErrorMessage,responseEmbed} from './presentation';
 export function prefixArguments(body:string,definition:{options:any[]}){
  const tokens=(body.match(/"(?:[^"\\]|\\.)*"|'[^']*'|\S+/g)??[]).map(s=>s.startsWith('"')?JSON.parse(s):s.startsWith("'")?s.slice(1,-1):s);
  const values:Record<string,any>={};for(let n=0;n<definition.options.length;n++){
@@ -25,6 +26,6 @@ export async function prefixCommand(message:Message){
   const get=(name:string,required=false)=>{const value=values[name]??null;if(required&&value===null)throw new AppError(400,`Paramètre manquant : ${name}.`);return value;};
   const context={guild:message.guild,guildId:message.guild.id,channel:message.channel,channelId:message.channelId,user:message.author,client:message.client,commandName:definition.name,options:{getString:get,getInteger:get,getBoolean:get,getUser:(n:string,r=false)=>{get(n,r);return users.get(n)??null;},getRole:(n:string,r=false)=>{get(n,r);return roles.get(n)??null;},getChannel:(n:string,r=false)=>{get(n,r);return channels.get(n)??null;}},editReply:(data:any)=>{if(!message.channel.isSendable())throw new AppError(400,'Salon inaccessible.');return message.channel.send(data);}};
   await dispatchCommand(context as unknown as CI);
- }catch(e){if(message.channel.isSendable())await message.channel.send({content:e instanceof AppError?e.message:'La commande a échoué. Vérifiez les permissions et les services externes.',allowedMentions:{parse:[]}});}
+ }catch(e){if(message.channel.isSendable())await message.channel.send({embeds:[responseEmbed('Cette commande demande votre attention',interactionErrorMessage(e),'error')],allowedMentions:{parse:[]}});}
  return true;
 }

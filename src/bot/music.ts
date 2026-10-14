@@ -7,6 +7,7 @@ import {config,json} from '../services/store';
 import {db} from '../lib/db';
 import {publish} from '../lib/redis';
 import {youtubeAudioStream} from './youtube-stream';
+import {responseEmbed,dashboardButton} from './presentation';
 type Track={id:string;title:string;requestedBy:string;url?:string};
 type Session={guild:Guild;channelId:string;player:any;connection:any;queue:Track[];current:Track|null;volume:number;loop:boolean;resource:any;source:Readable|null;process:ReturnType<typeof spawn>|null;timer:ReturnType<typeof setTimeout>|null;loading:boolean;generation:number;error:string|null};
 const sessions=new Map<string,Session>();
@@ -104,4 +105,4 @@ async function performMusicAction(guild:Guild,userId:string,action:string,value?
  else if(action==='shuffle'){for(let n=s.queue.length-1;n>0;n--){const r=randomInt(n+1);[s.queue[n],s.queue[r]]=[s.queue[r],s.queue[n]];}}
  else throw new AppError(400,'Action musicale inconnue.');await persist(s);return action==='loop'?`Répétition ${s.loop?'activée':'désactivée'}.`:action==='volume'?`Volume : ${s.volume} %.`:`Action ${action} effectuée.`;
 }
-export async function musicCommand(i:ChatInputCommandInteraction){const text=await musicAction(i.guild!,i.user.id,i.commandName,i.commandName==='volume'?i.options.getInteger('niveau',true):i.commandName==='remove'?i.options.getInteger('position',true):undefined,i.commandName==='play'?i.options.getString('recherche',true):undefined);await i.editReply(text.length>1800?{content:'File musicale complète :',files:[{attachment:Buffer.from(text),name:'file-musicale.txt'}],allowedMentions:{parse:[]}}:{content:text,allowedMentions:{parse:[]}});}
+export async function musicCommand(i:ChatInputCommandInteraction){const text=await musicAction(i.guild!,i.user.id,i.commandName,i.commandName==='volume'?i.options.getInteger('niveau',true):i.commandName==='remove'?i.options.getInteger('position',true):undefined,i.commandName==='play'?i.options.getString('recherche',true):undefined);const session=sessions.get(i.guildId!);const embed=responseEmbed('Votre espace musical',text,'success');if(session)embed.addFields({name:'Volume',value:`${session.volume} %`,inline:true},{name:'À suivre',value:`${session.queue.length} morceau${session.queue.length>1?'x':''}`,inline:true},{name:'Répétition',value:session.loop?'Activée':'Désactivée',inline:true});await i.editReply(text.length>3800?{content:'Votre file musicale complète :',files:[{attachment:Buffer.from(text),name:'file-musicale.txt'}],components:[dashboardButton(i.guildId!,'music')],allowedMentions:{parse:[]}}:{embeds:[embed],components:[dashboardButton(i.guildId!,'music')],allowedMentions:{parse:[]}});}

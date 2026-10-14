@@ -12,6 +12,7 @@ import {prefixCommand} from './prefix';
 import {participate} from '../services/community';
 import {handledCommandNames} from './commands';
 import {builtinCommands} from '../shared/commands';
+import {responseEmbed,interactionErrorMessage} from './presentation';
 const intents=[GatewayIntentBits.Guilds,GatewayIntentBits.GuildMessages,GatewayIntentBits.GuildVoiceStates];
 if(process.env.DISCORD_MEMBERS_INTENT==='true')intents.push(GatewayIntentBits.GuildMembers);
 if(process.env.DISCORD_MESSAGE_CONTENT_INTENT==='true')intents.push(GatewayIntentBits.MessageContent);
@@ -38,6 +39,7 @@ async function work(){
   if(busy)return;busy=true;
   try {
     const maintenance=await db.globalSetting.findUnique({where:{key:'maintenance'}});if(maintenance?.value===true)return;
+    if(!await db.job.findFirst({where:{status:'queued',runAt:{lte:new Date()}},select:{id:true}}))return;
     const job=await db.$transaction(async tx=>{
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended('atlas:job-claim',0))`;
       const rows=await tx.$queryRaw<{id:string}[]>`SELECT j.id FROM "Job" j WHERE j.status = 'queued' AND j."runAt" <= NOW() AND NOT EXISTS (SELECT 1 FROM "Job" r WHERE r."guildId" = j."guildId" AND r.status = 'running') ORDER BY j."runAt" ASC FOR UPDATE SKIP LOCKED LIMIT 1`;
@@ -45,7 +47,7 @@ async function work(){
       return tx.job.update({where:{id:rows[0].id},data:{status:'running',lockedAt:new Date(),attempts:{increment:1}}});
     });
     if(!job)return;
-    try {const result=await execute(client,job);await db.job.update({where:{id:job.id},data:{status:'done',result:json(result ?? {ok:true})}});await audit(job.guildId,job.actorId,`job.${job.kind}.done`,{jobId:job.id});}
+    try {const result=await execute(client,job);await db.job.update({where:{id:job.id},data:{status:'done',result:json(result ?? {ok:true})}});await audit(job.guildId,job.actorId,`job.${job.kind}.done`,{jobId:job.id}).catch(error=>console.error('Job audit delayed:',error?.name??'Error'));}
     catch(error){
       const message=error instanceof AppError?error.message:'Échec Discord ou base de données. Vérifiez si l’action a été appliquée avant de la relancer.';
       const retry=job.kind==='twitchLive'&&!(error instanceof AppError)&&job.attempts<3&&Date.now()-job.createdAt.getTime()<120000;
@@ -138,7 +140,7 @@ client.on(Events.InteractionCreate,safe(async interaction=>{
       if(interaction.commandName==='remind'||['Modération','Configuration','Économie','Niveaux','Rôles'].includes(builtinCommands.find(c=>c.name===interaction.commandName)?.category??''))await interaction.deferReply({flags:64});else await interaction.deferReply();
       await dispatchCommand(interaction);
     }
-  }catch(error){const message=error instanceof AppError?error.message:'Discord a refusé l’action. Vérifiez les permissions du bot.';if(interaction.isRepliable()){if(interaction.deferred||interaction.replied)await interaction.editReply(message);else await interaction.reply({content:message,flags:64});}}
+  }catch(error){const payload={embeds:[responseEmbed('Une vérification est nécessaire',interactionErrorMessage(error),'error')],allowedMentions:{parse:[] as never[]}};if(interaction.isRepliable()){try{if(interaction.deferred||interaction.replied)await interaction.editReply(payload);else await interaction.reply({...payload,flags:64});}catch(responseError){console.error('Interaction response unavailable:',(responseError as any)?.name??'Error',(responseError as any)?.code??'');}}}
 }));
 if(!process.env.DISCORD_BOT_TOKEN)throw new Error('DISCORD_BOT_TOKEN missing. See installation guide.');
 await client.login(process.env.DISCORD_BOT_TOKEN);

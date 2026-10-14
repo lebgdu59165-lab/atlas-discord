@@ -80,8 +80,15 @@ async function handler(req:Request,{params}:{params:Promise<{path:string[]}>}) {
       if(b==='my-economy' && method==='GET') return response(await db.account.findUnique({where:{guildId_userId:{guildId,userId:actor}}}) ?? {wallet:0,bank:0,inventory:[]});
     }
     const module=b==='config'?c:b==='records'?c:b;
-    const permission=(!b || ['overview','statistics','decision','publish','shifts','verify'].includes(b))?undefined:b==='config'?'config':b==='jobs'?'logs':permissionFor(module ?? 'overview');
+    const permission=(!b || ['overview','statistics','decision','publish','shifts','verify'].includes(b))?undefined:['config','directory'].includes(b)?'config':b==='jobs'?'logs':permissionFor(module ?? 'overview');
     const auth=await authorize(guildId,actor,permission);
+    if(b==='directory'&&method==='GET'){
+      const cacheKey=`directory:${guildId}`,cached=await redis().get(cacheKey).catch(()=>null);if(cached){try{return response(JSON.parse(cached));}catch{}}
+      const [channels,roles,member]=await Promise.all([discord<any[]>(`/guilds/${guildId}/channels`),discord<any[]>(`/guilds/${guildId}/roles`),discord<{roles:string[]}>(`/guilds/${guildId}/members/${process.env.DISCORD_CLIENT_ID}`)]);
+      const highest=Math.max(0,...roles.filter(r=>member.roles.includes(r.id)).map(r=>r.position));
+      const directory={channels:channels.sort((a,b)=>a.position-b.position).map(c=>({id:c.id,name:c.name,type:c.type})),roles:roles.filter(r=>r.id!==guildId).sort((a,b)=>b.position-a.position).map(r=>({id:r.id,name:r.name,managed:r.managed,manageable:!r.managed&&r.position<highest}))};
+      await redis().set(cacheKey,JSON.stringify(directory),'EX',60).catch(()=>{});return response(directory);
+    }
     if(!b || b==='overview' || b==='statistics') {
       const [metrics,tickets,cases,audits,heartbeat]=await Promise.all([db.metric.findMany({where:{guildId},orderBy:{day:'asc'}}),db.ticket.groupBy({by:['status'],where:{guildId},_count:true}),db.case.count({where:{guildId}}),db.audit.findMany({where:{guildId},take:12,orderBy:{createdAt:'desc'}}),db.globalSetting.findUnique({where:{key:'botHeartbeat'}})]);
       return response({guild:auth.guild,permissions:auth.permissions,metrics,tickets,cases,audits:auth.permissions.includes('logs')?audits:[],heartbeat:heartbeat?.value ?? null});
