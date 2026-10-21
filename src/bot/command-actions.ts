@@ -9,9 +9,10 @@ import {economy} from '../services/community';
 import {sanction,setRole,guardTarget,automation} from './actions';
 import {levelOf,snowflake} from '../shared/catalog';
 import {positiveAmount,rollDice,calculate,decodeBase64} from '../lib/command-tools';
-import {responseEmbed} from './presentation';
+import {responseEmbed,dashboardButton} from './presentation';
+import {openDashboard} from './dashboard';
 export type CI=ChatInputCommandInteraction;
-const content=(i:CI,text:string)=>i.editReply({embeds:[responseEmbed(i.commandName?`Commande /${i.commandName}`:'Atlas',text)],allowedMentions:{parse:[]}});
+const content=(i:CI,text:string)=>i.editReply({embeds:[responseEmbed(i.commandName?`Commande /${i.commandName}`:'Atlas',text)],components:[dashboardButton(i.guildId!)],allowedMentions:{parse:[]}});
 export async function staff(i:CI,permission:any,flag?:bigint){
  const member=await i.guild!.members.fetch(i.user.id);
  if(i.user.id===i.guild!.ownerId||member.permissions.has(P.Administrator)||(flag&&member.permissions.has(flag)))return member;
@@ -63,7 +64,7 @@ for(const name of ['prefix','setlog','setwelcome','autorole','setxp','config'])a
  if(name==='setwelcome'){const channel=await targetChannel(i);const message=i.options.getString('message');await changeConfig(i,'welcome',{enabled:true,channelId:channel.id,...(message?{message}:{})});return content(i,'Message de bienvenue enregistré. Variable de membre : {user}.');}
  if(name==='autorole'){const role=await i.guild!.roles.fetch(i.options.getRole('role',true).id),bot=await i.guild!.members.fetchMe();if(!role||role.managed||role.id===i.guildId||role.position>=bot.roles.highest.position)throw new AppError(403,'Le bot ne peut pas attribuer ce rôle.');const actor=await i.guild!.members.fetch(i.user.id);if(actor.id!==i.guild!.ownerId&&(role.position>=actor.roles.highest.position||(role.permissions.bitfield & ~actor.permissions.bitfield)!==0n))throw new AppError(403,'Ce rôle dépasse vos permissions.');const c=await config(i.guildId!,'autoroles');await changeConfig(i,'autoroles',{enabled:true,roleIds:[...new Set([...(c.value.roleIds as string[]),role.id])]});return content(i,'Autorôle enregistré. Il sera attribué aux prochaines arrivées.');}
  if(name==='setxp'){const enabled=i.options.getBoolean('actif',true);await changeConfig(i,'levels',{enabled});return content(i,enabled?'Système de niveaux activé.':'Système de niveaux désactivé.');}
- const modules=['moderation','automod','tickets','levels','economy','welcome','music'];const settings=await Promise.all(modules.map(async m=>`${m} : ${(await config(i.guildId!,m)).value.enabled?'actif':'inactif'}`));return content(i,`${settings.join('\n')}\nTableau de bord : ${process.env.APP_URL}/dashboard/${i.guildId}`);
+ return openDashboard(i);
 };
 for(const name of ['rank','leaderboard','givexp','resetxp'])actionHandlers[name]=async i=>{
  if(name==='rank'){const user=i.options.getUser('membre')??i.user;const l=await db.level.findUnique({where:{guildId_userId:{guildId:i.guildId!,userId:user.id}}});return content(i,`${user.username} · niveau ${levelOf(l?.xp??0)} · ${l?.xp??0} XP.`);}
@@ -76,7 +77,7 @@ for(const name of ['balance','daily','work','pay','deposit','withdraw','gamble',
  const c=await config(i.guildId!,'economy');if(!c.value.enabled)throw new AppError(409,'L’économie est désactivée dans le tableau de bord.');const currency=String(c.value.currency);
  if(name==='balance'){const user=i.options.getUser('membre')??i.user;const a=await db.account.findUnique({where:{guildId_userId:{guildId:i.guildId!,userId:user.id}}});return content(i,`${user.username} · portefeuille : ${a?.wallet??0} ${currency} · banque : ${a?.bank??0} ${currency}.`);}
  if(name==='richesse'){const rows=await db.$queryRaw<{userId:string;total:number}[]>`SELECT "userId", "wallet"+"bank" AS total FROM "Account" WHERE "guildId"=${i.guildId!} ORDER BY total DESC, "userId" ASC LIMIT 10`;return content(i,rows.length?rows.map((r,n)=>`${n+1}. <@${r.userId}> · ${r.total} ${currency} (portefeuille + banque)`).join('\n'):'Aucun compte enregistré.');}
- if(name==='shop'){const items=await db.entity.findMany({where:{guildId:i.guildId!,module:'shop',status:'active'},take:15});return content(i,items.length?`${items.map(r=>`${r.title} · ${(r.data as any).price} ${currency}`).join('\n')}\nAcheter : ${process.env.APP_URL}/community/${i.guildId}`:`La boutique est vide. Ajoutez des articles dans ${process.env.APP_URL}/dashboard/${i.guildId}/shop`);}
+ if(name==='shop')return openDashboard(i,'shop');
  let amount:number|undefined,userId:string|undefined;
  if(['deposit','withdraw','gamble'].includes(name)){const a=await db.account.findUnique({where:{guildId_userId:{guildId:i.guildId!,userId:i.user.id}}});amount=positiveAmount(i.options.getString('montant',true),name==='withdraw'?a?.bank??0:a?.wallet??0);}
  if(name==='pay'){const user=i.options.getUser('membre',true);if(user.bot)throw new AppError(400,'Choisissez un membre humain.');await i.guild!.members.fetch(user.id);userId=user.id;amount=i.options.getInteger('montant',true);}

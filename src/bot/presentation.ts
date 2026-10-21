@@ -4,7 +4,7 @@ export function responseEmbed(title:string,description:string,tone:'default'|'su
  return new EmbedBuilder().setColor(tone==='error'?0xed7f99:tone==='success'?0x64d9b0:0x9b82f5).setTitle(title.slice(0,256)).setDescription(description.slice(0,4096)).setFooter({text:'Atlas · Votre communauté, sous contrôle'}).setTimestamp();
 }
 export function dashboardButton(guildId:string,module='overview'){
- const origin=process.env.APP_URL??'https://atlas-dashboard-vf3d.onrender.com';return new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setLabel('Ouvrir le tableau de bord').setStyle(ButtonStyle.Link).setURL(`${origin}/dashboard/${guildId}/${module}`));
+ return new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setLabel('Panneau Discord').setEmoji('🎛️').setStyle(ButtonStyle.Secondary).setCustomId(`atlas:open:${guildId}:${module}`));
 }
 export function interactionErrorMessage(error:unknown){
  if(error instanceof AppError)return error.message;

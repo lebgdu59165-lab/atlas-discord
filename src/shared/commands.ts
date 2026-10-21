@@ -1,5 +1,6 @@
 export type NativeCommandDefinition={name:string;description:string;category:string;options:any[]};
 export const builtinCommands:NativeCommandDefinition[]=[
+  {name:'dashboard',description:'Votre panneau de contrôle interactif directement dans Discord',category:'Configuration',options:[]},
   {
     "name": "help",
     "description": "Affiche l'aide du bot",

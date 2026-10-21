@@ -10,6 +10,7 @@ Stack : Next.js 16, React 19, TypeScript, Tailwind 4, Radix Dialog, Node.js 24, 
 - [Architecture, sécurité et API](docs/ARCHITECTURE.md)
 - [Tests automatisés et recette Discord](docs/TESTS.md)
 - [Notifications automatiques Twitch](docs/TWITCH.md)
+- [Panneau de contrôle directement dans Discord](docs/DASHBOARD-DISCORD.md)
 - [Couverture et développements restants](docs/COUVERTURE.md)
 
 ## Démarrage

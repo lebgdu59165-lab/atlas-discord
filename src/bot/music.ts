@@ -52,6 +52,7 @@ export async function findTrack(query:string,userId:string):Promise<Track>{
 }
 async function persist(s:Session){await db.entity.upsert({where:{id:`music:${s.guild.id}`},create:{id:`music:${s.guild.id}`,guildId:s.guild.id,module:'music-state',title:'Lecteur audio',ownerId:s.guild.client.user!.id,status:'active',data:json(state(s))},update:{data:json(state(s)),status:'active'}});await publish(s.guild.id,'music');}
 function state(s:Session){return {channelId:s.channelId,current:s.current,queue:s.queue,volume:s.volume,loop:s.loop,paused:s.player.state.status==='paused',connected:s.connection.state.status==='ready',error:s.error,checkedAt:new Date().toISOString()};}
+export function musicSnapshot(guildId:string){const session=sessions.get(guildId);return session?state(session):null;}
 function killAudio(s:Session){s.source?.destroy();s.process?.kill();s.source=null;s.process=null;s.resource=null;}
 async function disconnect(s:Session){s.generation++;sessions.delete(s.guild.id);if(s.timer)clearTimeout(s.timer);s.queue=[];s.current=null;s.loop=false;killAudio(s);s.player.stop(true);if(s.connection.state.status!=='destroyed')s.connection.destroy();await persist(s);}
 async function idle(s:Session){if(s.timer)clearTimeout(s.timer);const c=await config(s.guild.id,'music');s.timer=setTimeout(()=>{void disconnect(s).catch(()=>{});},Number(c.value.idleSeconds)*1000);s.timer.unref();}

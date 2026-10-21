@@ -9,7 +9,8 @@ import {actionHandlers} from './command-actions';
 import {communityHandlers} from './command-community';
 import {musicNames,musicCommand} from './music';
 import {responseEmbed,dashboardButton} from './presentation';
-export const baseCommandNames=['help','ping','uptime','stats','userinfo','serverinfo','avatar'];
+import {openDashboard} from './dashboard';
+export const baseCommandNames=['dashboard','help','ping','uptime','stats','userinfo','serverinfo','avatar'];
 export const nativeActionHandlers={...actionHandlers,...communityHandlers,...Object.fromEntries(musicNames.map(name=>[name,musicCommand]))};
 export const handledCommandNames=[...baseCommandNames,...Object.keys(nativeActionHandlers)];
 const startedAt=Date.now();
@@ -32,15 +33,15 @@ export async function dispatchCommand(interaction:ChatInputCommandInteraction){
     if(!builtin)throw new AppError(404,`Commande /${interaction.commandName} introuvable. Utilisez /help.`);
     const settings=await config(guild.id,'commands');const disabled=String(settings.value.disabledNative??'').split(/[\s,]+/).map(s=>s.replace(/^\//,''));
     if(disabled.includes(builtin.name))throw new AppError(409,`La commande /${builtin.name} est désactivée dans le tableau de bord.`);
-    const reply=(content:string)=>interaction.editReply({embeds:[responseEmbed(({help:'Votre guide des commandes',ping:'Connexion Discord',uptime:'Disponibilité du bot',serverinfo:'Votre serveur',userinfo:'Profil du membre',stats:'Votre communauté en chiffres'} as Record<string,string>)[builtin.name]??'Atlas',content)],allowedMentions:{parse:[]}});
-    const dashboard=`${process.env.APP_URL??'https://atlas-dashboard-vf3d.onrender.com'}/dashboard/${guild.id}`;
-    if(nativeActionHandlers[builtin.name])await nativeActionHandlers[builtin.name](interaction);
+    const reply=(content:string)=>interaction.editReply({embeds:[responseEmbed(({help:'Votre guide des commandes',ping:'Connexion Discord',uptime:'Disponibilité du bot',serverinfo:'Votre serveur',userinfo:'Profil du membre',stats:'Votre communauté en chiffres'} as Record<string,string>)[builtin.name]??'Atlas',content)],components:[dashboardButton(guild.id)],allowedMentions:{parse:[]}});
+    if(builtin.name==='dashboard')await openDashboard(interaction);
+    else if(nativeActionHandlers[builtin.name])await nativeActionHandlers[builtin.name](interaction);
     else if(builtin.name==='help'){
       const selected=interaction.options.getString('commande')?.replace(/^\//,'');
       const available=[...builtinCommands.filter(c=>!disabled.includes(c.name)).map(c=>({name:c.name,description:c.description})),...records.filter(r=>(r.data as any).enabled).map(r=>({name:(r.data as any).name,description:(r.data as any).description||r.title}))];
       const help=selected?available.filter(c=>c.name===selected):[...new Map(available.map(c=>[c.name,c])).values()];
-      if(selected){const definition=builtinCommands.find(c=>c.name===selected);await reply(`${!help.length?`/${selected} n’est pas disponible actuellement.`:help.map(c=>`**/${c.name}** — ${c.description}`).join('\n')}\n${definition?.options.map(o=>`${o.required?'<':'['}${o.name}${o.required?'>':']'} : ${o.description}`).join('\n')??''}\nTableau de bord : ${dashboard}`);}
-      else{const groups=[...new Set(builtinCommands.map(c=>c.category))];await interaction.editReply({embeds:[responseEmbed('Tout votre serveur, à portée de commande',`Réglages : ${dashboard}\n**Une commande en détail** : /help commande:nom\n**Musique** : rejoignez un vocal, puis /play\nLes durées sont exprimées en minutes.`).addFields([...groups.map(category=>({name:category,value:builtinCommands.filter(c=>c.category===category&&!disabled.includes(c.name)).map(c=>`\`/${c.name}\``).join(' · ')||'Commandes désactivées'})),...(records.some(r=>(r.data as any).enabled)?[{name:'Vos commandes personnalisées',value:records.filter(r=>(r.data as any).enabled).map(r=>`/${(r.data as any).name}`).join(' · ').slice(0,1024)}]:[])])],components:[dashboardButton(guild.id,'commands')],allowedMentions:{parse:[]}});}
+      if(selected){const definition=builtinCommands.find(c=>c.name===selected);await reply(`${!help.length?`/${selected} n’est pas disponible actuellement.`:help.map(c=>`**/${c.name}** — ${c.description}`).join('\n')}\n${definition?.options.map(o=>`${o.required?'<':'['}${o.name}${o.required?'>':']'} : ${o.description}`).join('\n')??''}\nPanneau interactif : /dashboard → Commandes.`);}
+      else{const groups=[...new Set(builtinCommands.map(c=>c.category))];await interaction.editReply({embeds:[responseEmbed('Tout votre serveur, à portée de commande',`**Votre panneau Discord** : /dashboard\n**Une commande en détail** : /help commande:nom\n**Musique** : rejoignez un vocal, puis /play\nLes durées sont exprimées en minutes.`).addFields([...groups.map(category=>({name:category,value:builtinCommands.filter(c=>c.category===category&&!disabled.includes(c.name)).map(c=>`\`/${c.name}\``).join(' · ')||'Commandes désactivées'})),...(records.some(r=>(r.data as any).enabled)?[{name:'Vos commandes personnalisées',value:records.filter(r=>(r.data as any).enabled).map(r=>`/${(r.data as any).name}`).join(' · ').slice(0,1024)}]:[])])],components:[dashboardButton(guild.id,'commands')],allowedMentions:{parse:[]}});}
     }else if(builtin.name==='ping')await reply(`🏓 Latence Discord : ${Math.max(0,interaction.client.ws.ping)} ms.`);
     else if(builtin.name==='uptime'){
       const seconds=Math.floor((Date.now()-startedAt)/1000);await reply(`Bot actif depuis ${Math.floor(seconds/86400)} j ${Math.floor(seconds/3600)%24} h ${Math.floor(seconds/60)%60} min ${seconds%60} s.`);
@@ -54,7 +55,7 @@ export async function dispatchCommand(interaction:ChatInputCommandInteraction){
       await interaction.editReply({embeds:[responseEmbed(`Avatar de ${user.username}`,'Photo de profil Discord.').setImage(user.displayAvatarURL({size:1024}))],allowedMentions:{parse:[]}});
     }else if(builtin.name==='stats'){
       const [tickets,cases,metrics]=await Promise.all([db.ticket.count({where:{guildId:guild.id,status:'open'}}),db.case.count({where:{guildId:guild.id}}),db.metric.aggregate({where:{guildId:guild.id,kind:'commands'},_sum:{count:true}})]);
-      await reply(`**${guild.name}**\nMembres : ${guild.memberCount}\nTickets ouverts : ${tickets}\nSanctions enregistrées : ${cases}\nCommandes utilisées : ${metrics._sum.count??0}\nTableau de bord : ${dashboard}`);
+      await reply(`**${guild.name}**\nMembres : ${guild.memberCount}\nTickets ouverts : ${tickets}\nSanctions enregistrées : ${cases}\nCommandes utilisées : ${metrics._sum.count??0}\nVotre panneau Discord : /dashboard.`);
     }else throw new AppError(500,'Gestionnaire de commande manquant.');
   }
   // A delivered response must not turn into a failure when usage logging is delayed.

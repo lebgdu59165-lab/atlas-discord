@@ -14,6 +14,7 @@ import {handledCommandNames} from './commands';
 import {builtinCommands} from '../shared/commands';
 import {responseEmbed,interactionErrorMessage} from './presentation';
 import {initializeWithRetry,initializationErrorReason} from './initialization';
+import {handleDashboardInteraction,isDashboardInteraction} from './dashboard';
 const intents=[GatewayIntentBits.Guilds,GatewayIntentBits.GuildMessages,GatewayIntentBits.GuildVoiceStates];
 if(process.env.DISCORD_MEMBERS_INTENT==='true')intents.push(GatewayIntentBits.GuildMembers);
 if(process.env.DISCORD_MESSAGE_CONTENT_INTENT==='true')intents.push(GatewayIntentBits.MessageContent);
@@ -133,7 +134,8 @@ client.on(Events.GuildBanRemove,safe(async b=>logEvent(b.guild,'member.unbanned'
 client.on(Events.InteractionCreate,safe(async interaction=>{
   if(!interaction.guild)return;
   try {
-    if((interaction.isButton()||interaction.isChatInputCommand())&&!initialization?.isReady())throw new AppError(503,'Le bot reconnecte ses services. Réessayez dans quelques instants. Aucune action n’a été lancée.');
+    if((interaction.isMessageComponent()||interaction.isModalSubmit()||interaction.isChatInputCommand())&&!initialization?.isReady())throw new AppError(503,'Le bot reconnecte ses services. Réessayez dans quelques instants. Aucune action n’a été lancée.');
+    if((interaction.isMessageComponent()||interaction.isModalSubmit())&&isDashboardInteraction(interaction)){await handleDashboardInteraction(interaction);return;}
     if(interaction.isButton()) {
       await interaction.deferReply({flags:64});
       if(interaction.customId==='verify'){const c=await config(interaction.guildId!,'autoroles');if(!c.value.enabled||!c.value.verifiedRoleId)throw new AppError(409,'Vérification désactivée.');await setRole(interaction.guild,interaction.user.id,String(c.value.verifiedRoleId),true);await interaction.editReply('Votre règlement a été accepté.');}

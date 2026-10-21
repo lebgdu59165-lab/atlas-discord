@@ -7,7 +7,7 @@ import { publish, redis } from '../lib/redis';
 import { snowflake } from '../shared/catalog';
 const MAX=1000000000;
 export async function economy(guildId:string,actorId:string,input:unknown,staff=false) {
-  const p=z.object({action:z.enum(['daily','weekly','work','deposit','withdraw','transfer','adjust','buy','gamble']),amount:z.number().int().min(-MAX).max(MAX).optional(),userId:snowflake.optional(),itemId:z.string().max(100).optional(),reason:z.string().min(1).max(1000).optional()}).strict().parse(input);
+  const p=z.object({action:z.enum(['daily','weekly','work','deposit','withdraw','transfer','adjust','buy','gamble']),amount:z.number().int().min(-MAX).max(MAX).optional(),userId:snowflake.optional(),itemId:z.string().max(100).optional(),expectedRevision:z.number().int().positive().optional(),expectedPrice:z.number().int().min(1).max(MAX).optional(),reason:z.string().min(1).max(1000).optional()}).strict().parse(input);
   if (p.action==='adjust' && !staff) throw new AppError(403,'Ajustement réservé au staff.');
   const c=await config(guildId,'economy'); if (!c.value.enabled) throw new AppError(409,'L’économie est désactivée.');
   const userId=p.action==='adjust' ? (p.userId ?? actorId) : actorId;
@@ -25,7 +25,9 @@ export async function economy(guildId:string,actorId:string,input:unknown,staff=
     else if (p.action==='buy') {
       const item=await tx.entity.findFirst({where:{id:p.itemId,guildId,module:'shop',status:'active'}});
       if (!item) throw new AppError(404,'Article introuvable.');
-      const d=item.data as any; amount=-Number(d.price);wallet+=amount;
+      const d=item.data as any;
+      if(p.expectedRevision!==undefined&&item.revision!==p.expectedRevision||p.expectedPrice!==undefined&&d.price!==p.expectedPrice)throw new AppError(409,'Cet article a changé. Consultez-le à nouveau avant d’acheter.');
+      amount=-Number(d.price);wallet+=amount;
       if (wallet<0) throw new AppError(409,'Solde insuffisant.');
       const inventory=[...(a.inventory as any[]),{itemId:item.id,title:item.title,purchasedAt:now.toISOString()}];extra.inventory=json(inventory);
       if (d.roleId) {

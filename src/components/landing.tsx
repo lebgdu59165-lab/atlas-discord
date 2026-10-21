@@ -10,7 +10,7 @@ const features=[
  {icon:Twitch,name:'Vos lives, au bon endroit',label:'Twitch',text:'Une annonce dans votre salon Discord quand votre chaîne passe en direct, une fois par live.'},
  {icon:Headphones,name:'La musique avec votre équipe',label:'Musique',text:'Recherchez un titre, partagez un lien YouTube ou un fichier audio Discord, puis pilotez la file.'},
  {icon:Users,name:'Une communauté qui participe',label:'Communauté',text:'Niveaux, économie virtuelle, événements, sondages et suggestions dans un espace commun.'},
- {icon:Command,name:'Des commandes à votre image',label:'Commandes',text:'70 commandes intégrées, un préfixe personnalisable et vos propres réponses Discord.'}
+ {icon:Command,name:'Des commandes à votre image',label:'Commandes',text:'Un panneau interactif dans Discord, un préfixe personnalisable et vos propres réponses.'}
 ];
 export function Landing(){
  const [me,setMe]=useState<Me|null>(null),[health,setHealth]=useState<any>(null),[theme,setTheme]=useState('dark'),[menu,setMenu]=useState(false);
