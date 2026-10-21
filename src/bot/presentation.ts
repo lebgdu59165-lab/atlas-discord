@@ -9,6 +9,7 @@ export function dashboardButton(guildId:string,module='overview'){
 export function interactionErrorMessage(error:unknown){
  if(error instanceof AppError)return error.message;
  const code=(error as any)?.code??(error as any)?.errorCode;
+ if((error as any)?.name==='PrismaClientInitializationError'||['P1000','P1001','P1002','P1017'].includes(String(code)))return 'La connexion à la base de données du bot est indisponible. Réessayez après son rétablissement ; vérifiez le résultat de votre action avant de la relancer.';
  if(/^P\d{4}$/.test(String(code)))return 'Le service de données est temporairement occupé. Vérifiez le résultat de l’action avant de la relancer.';
  if(Number(code)===50013)return 'Atlas n’a pas les permissions nécessaires. Vérifiez ses droits et la position de son rôle dans Discord.';
  if(Number(code)===50001)return 'Atlas n’a plus accès à cet élément. Vérifiez les permissions du salon ou du serveur.';

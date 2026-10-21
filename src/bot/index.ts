@@ -13,6 +13,7 @@ import {participate} from '../services/community';
 import {handledCommandNames} from './commands';
 import {builtinCommands} from '../shared/commands';
 import {responseEmbed,interactionErrorMessage} from './presentation';
+import {initializeWithRetry} from './initialization';
 const intents=[GatewayIntentBits.Guilds,GatewayIntentBits.GuildMessages,GatewayIntentBits.GuildVoiceStates];
 if(process.env.DISCORD_MEMBERS_INTENT==='true')intents.push(GatewayIntentBits.GuildMembers);
 if(process.env.DISCORD_MESSAGE_CONTENT_INTENT==='true')intents.push(GatewayIntentBits.MessageContent);
@@ -22,17 +23,19 @@ async function track(guild:Guild) {
   await db.guild.upsert({where:{id:guild.id},create:{id:guild.id,name:guild.name,ownerId:guild.ownerId,icon:guild.icon,memberCount:guild.memberCount,channels:guild.channels.cache.size,roles:guild.roles.cache.size},update:{name:guild.name,ownerId:guild.ownerId,icon:guild.icon,memberCount:guild.memberCount,channels:guild.channels.cache.size,roles:guild.roles.cache.size,installed:true,online:process.env.DISCORD_PRESENCE_INTENT==='true'?guild.presences.cache.filter(p=>p.status!=='offline').size:null}});
 }
 const safe=(fn:(...args:any[])=>Promise<any>)=>(...args:any[])=>void fn(...args).catch(e=>console.error('Bot event failed:',e instanceof AppError?e.message:e?.name ?? 'UnknownError',/^P\d{4}$/.test(e?.errorCode??e?.code??'')?(e.errorCode??e.code):''));
-client.once(Events.ClientReady,safe(async()=>{
+let initialization:ReturnType<typeof initializeWithRetry>|undefined;
+client.once(Events.ClientReady,()=>{initialization=initializeWithRetry(async()=>{
   for(const guild of client.guilds.cache.values())await track(guild);
   await db.entity.updateMany({where:{guildId:{in:[...client.guilds.cache.keys()]},module:'music-state'},data:{status:'offline',data:json({connected:false,current:null,queue:[],checkedAt:new Date().toISOString()})}});
   await db.job.updateMany({where:{status:'running',lockedAt:{lt:new Date(Date.now()-300000)}},data:{status:'failed',error:'Exécution interrompue : vérifier Discord avant de relancer manuellement.'}});
+  await heartbeat();
   setInterval(safe(heartbeat),15000).unref();setInterval(safe(work),2500).unref();setInterval(safe(expireBans),30000).unref();
   setInterval(safe(async()=>{for(const guild of client.guilds.cache.values())await track(guild);}),60000).unref();
   setInterval(safe(cleanup),3600000).unref();setInterval(safe(closeDue),60000).unref();
   setInterval(safe(()=>pollTwitch(client)),60000).unref();
-  await heartbeat();console.log(`Atlas connected: ${client.guilds.cache.size} guilds`);
+  console.log(`Atlas connected: ${client.guilds.cache.size} guilds`);
   safe(()=>pollTwitch(client))();
-}));
+},error=>console.error('Bot initialization waiting for services:',(error as any)?.name??'Error',(error as any)?.errorCode??(error as any)?.code??''));});
 async function heartbeat(){await db.globalSetting.upsert({where:{key:'botHeartbeat'},create:{key:'botHeartbeat',value:json({at:Date.now(),latency:client.ws.ping,intents:process.env.DISCORD_MESSAGE_CONTENT_INTENT==='true',commands:handledCommandNames})},update:{value:json({at:Date.now(),latency:client.ws.ping,intents:process.env.DISCORD_MESSAGE_CONTENT_INTENT==='true',commands:handledCommandNames})}});}
 let busy=false;
 async function work(){
@@ -128,6 +131,7 @@ client.on(Events.GuildBanRemove,safe(async b=>logEvent(b.guild,'member.unbanned'
 client.on(Events.InteractionCreate,safe(async interaction=>{
   if(!interaction.guild)return;
   try {
+    if((interaction.isButton()||interaction.isChatInputCommand())&&!initialization?.isReady())throw new AppError(503,'Le bot reconnecte ses services. Réessayez dans quelques instants. Aucune action n’a été lancée.');
     if(interaction.isButton()) {
       await interaction.deferReply({flags:64});
       if(interaction.customId==='verify'){const c=await config(interaction.guildId!,'autoroles');if(!c.value.enabled||!c.value.verifiedRoleId)throw new AppError(409,'Vérification désactivée.');await setRole(interaction.guild,interaction.user.id,String(c.value.verifiedRoleId),true);await interaction.editReply('Votre règlement a été accepté.');}
@@ -140,8 +144,8 @@ client.on(Events.InteractionCreate,safe(async interaction=>{
       if(interaction.commandName==='remind'||['Modération','Configuration','Économie','Niveaux','Rôles'].includes(builtinCommands.find(c=>c.name===interaction.commandName)?.category??''))await interaction.deferReply({flags:64});else await interaction.deferReply();
       await dispatchCommand(interaction);
     }
-  }catch(error){const payload={embeds:[responseEmbed('Une vérification est nécessaire',interactionErrorMessage(error),'error')],allowedMentions:{parse:[] as never[]}};if(interaction.isRepliable()){try{if(interaction.deferred||interaction.replied)await interaction.editReply(payload);else await interaction.reply({...payload,flags:64});}catch(responseError){console.error('Interaction response unavailable:',(responseError as any)?.name??'Error',(responseError as any)?.code??'');}}}
+  }catch(error){console.error('Bot interaction failed:',interaction.isChatInputCommand()?interaction.commandName:'button',(error as any)?.name??'Error',(error as any)?.errorCode??(error as any)?.code??'');const payload={embeds:[responseEmbed('Une vérification est nécessaire',interactionErrorMessage(error),'error')],allowedMentions:{parse:[] as never[]}};if(interaction.isRepliable()){try{if(interaction.deferred||interaction.replied)await interaction.editReply(payload);else await interaction.reply({...payload,flags:64});}catch(responseError){console.error('Interaction response unavailable:',(responseError as any)?.name??'Error',(responseError as any)?.code??'');}}}
 }));
 if(!process.env.DISCORD_BOT_TOKEN)throw new Error('DISCORD_BOT_TOKEN missing. See installation guide.');
 await client.login(process.env.DISCORD_BOT_TOKEN);
-process.on('SIGTERM',async()=>{client.destroy();await db.$disconnect();process.exit(0);});
+process.on('SIGTERM',async()=>{initialization?.stop();client.destroy();await db.$disconnect();process.exit(0);});
