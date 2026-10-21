@@ -13,7 +13,7 @@ import {participate} from '../services/community';
 import {handledCommandNames} from './commands';
 import {builtinCommands} from '../shared/commands';
 import {responseEmbed,interactionErrorMessage} from './presentation';
-import {initializeWithRetry} from './initialization';
+import {initializeWithRetry,initializationErrorReason} from './initialization';
 const intents=[GatewayIntentBits.Guilds,GatewayIntentBits.GuildMessages,GatewayIntentBits.GuildVoiceStates];
 if(process.env.DISCORD_MEMBERS_INTENT==='true')intents.push(GatewayIntentBits.GuildMembers);
 if(process.env.DISCORD_MESSAGE_CONTENT_INTENT==='true')intents.push(GatewayIntentBits.MessageContent);
@@ -25,6 +25,7 @@ async function track(guild:Guild) {
 const safe=(fn:(...args:any[])=>Promise<any>)=>(...args:any[])=>void fn(...args).catch(e=>console.error('Bot event failed:',e instanceof AppError?e.message:e?.name ?? 'UnknownError',/^P\d{4}$/.test(e?.errorCode??e?.code??'')?(e.errorCode??e.code):''));
 let initialization:ReturnType<typeof initializeWithRetry>|undefined;
 client.once(Events.ClientReady,()=>{initialization=initializeWithRetry(async()=>{
+ try{
   for(const guild of client.guilds.cache.values())await track(guild);
   await db.entity.updateMany({where:{guildId:{in:[...client.guilds.cache.keys()]},module:'music-state'},data:{status:'offline',data:json({connected:false,current:null,queue:[],checkedAt:new Date().toISOString()})}});
   await db.job.updateMany({where:{status:'running',lockedAt:{lt:new Date(Date.now()-300000)}},data:{status:'failed',error:'Exécution interrompue : vérifier Discord avant de relancer manuellement.'}});
@@ -35,7 +36,8 @@ client.once(Events.ClientReady,()=>{initialization=initializeWithRetry(async()=>
   setInterval(safe(()=>pollTwitch(client)),60000).unref();
   console.log(`Atlas connected: ${client.guilds.cache.size} guilds`);
   safe(()=>pollTwitch(client))();
-},error=>console.error('Bot initialization waiting for services:',(error as any)?.name??'Error',(error as any)?.errorCode??(error as any)?.code??''));});
+ }catch(error){await db.$disconnect().catch(()=>{});throw error;}
+},error=>console.error('Bot initialization waiting for services:',(error as any)?.name??'Error',initializationErrorReason(error)));});
 async function heartbeat(){await db.globalSetting.upsert({where:{key:'botHeartbeat'},create:{key:'botHeartbeat',value:json({at:Date.now(),latency:client.ws.ping,intents:process.env.DISCORD_MESSAGE_CONTENT_INTENT==='true',commands:handledCommandNames})},update:{value:json({at:Date.now(),latency:client.ws.ping,intents:process.env.DISCORD_MESSAGE_CONTENT_INTENT==='true',commands:handledCommandNames})}});}
 let busy=false;
 async function work(){
